@@ -27,3 +27,31 @@
     "nav": "10.72050",
     "date": "29-05-2008"
   },
+
+
+  // ---> Nav history api result
+
+
+  "meta": {
+    "fund_house": "SBI Mutual Fund",
+    "scheme_type": "Open Ended Schemes",
+    "scheme_category": "Equity Scheme - Small Cap Fund",
+    "scheme_code": 125497,
+    "scheme_name": "SBI Small Cap Fund - Direct Plan - Growth",
+    "isin_growth": "INF200K01T51",
+    "isin_div_reinvestment": null
+  },
+  "data": [
+    {
+      "date": "04-02-2026",
+      "nav": "186.77740"
+    },
+    {
+      "date": "03-02-2026",
+      "nav": "186.70090"
+    },
+    {
+      "date": "02-02-2026",
+      "nav": "180.54240"
+    },
+    {
