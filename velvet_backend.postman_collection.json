@@ -1,0 +1,589 @@
+{
+    "info": {
+        "_postman_id": "7f8a7d3b-8c2e-4e5a-9b1c-3d2f1a0b9c8d",
+        "name": "Velvet Backend API",
+        "description": "API collection for Velvet Backend project including onboarding, finance, assets, loans, insurance, and goals.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Request OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"mob\": \"9999999999\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/req-otp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "req-otp"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Validate OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"mob\": \"9999999999\",\n    \"otp\": \"123456\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/validate-otp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "validate-otp"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "General",
+            "item": [
+                {
+                    "name": "Ping",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ping",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ping"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Onboarding",
+            "item": [
+                {
+                    "name": "Complete Step",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"current_step\": 2,\n    \"annual_income\": 1200000,\n    \"expense_house\": 25000,\n    \"expense_food\": 15000,\n    \"expense_transportation\": 10000,\n    \"expense_others\": 5000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/onboarding/complete-step",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "onboarding",
+                                "complete-step"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Finance",
+            "item": [
+                {
+                    "name": "Create Finance",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"annual_income\": 1500000,\n    \"expense_house\": 30000,\n    \"expense_food\": 20000,\n    \"expense_transportation\": 12000,\n    \"expense_others\": 8000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-finance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-finance"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Finance",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"annual_income\": 1600000,\n    \"expense_house\": 35000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-finance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-finance"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Finance",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-finance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-finance"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Finance",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-finance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-finance"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Assets",
+            "item": [
+                {
+                    "name": "Create Assets",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"mututal_funds\": 500000,\n    \"stocks\": 200000,\n    \"fd\": 100000,\n    \"real_estate\": 5000000,\n    \"gold\": 300000,\n    \"cash_saving\": 50000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-assets",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-assets"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Assets",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"stocks\": 250000,\n    \"gold\": 350000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-assets",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-assets"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Assets",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-assets",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-assets"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Assets",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-assets",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-assets"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Loan",
+            "item": [
+                {
+                    "name": "Create Loan",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"loan_type\": \"Home Loan\",\n    \"loan_name\": \"SBI Home Loan\",\n    \"outstanding_amount\": 4500000,\n    \"monthly_emi\": 45000,\n    \"tenure_months\": 240\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-loan",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-loan"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Loan",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"outstanding_amount\": 4400000,\n    \"monthly_emi\": 45000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-loan/:loan_id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-loan",
+                                ":loan_id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "loan_id",
+                                    "value": "ENTER_LOAN_ID"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Loans",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-loan?page=1&limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-loan"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "50"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Loan By ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-loan/:loan_id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-loan",
+                                ":loan_id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "loan_id",
+                                    "value": "ENTER_LOAN_ID"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Loan",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-loan/:loan_id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-loan",
+                                ":loan_id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "loan_id",
+                                    "value": "ENTER_LOAN_ID"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Insurance",
+            "item": [
+                {
+                    "name": "Create/Update Insurance",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"life_insurance\": 10000000,\n    \"health_insurance\": 500000\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-insurance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-insurance"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Insurance",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/user-insurance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-insurance"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Goal",
+            "item": [
+                {
+                    "name": "Create Child Education Goal",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 10,\n    \"years_left\": 10,\n    \"current_goal_cost\": 25,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-goal",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-goal"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Retirement Goal",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"goal_type_id\": 3,\n    \"current_age\": 40,\n    \"retirement_age\": 60,\n    \"life_expectancy\": 80,\n    \"current_monthly_expense\": 100000,\n    \"post_retirement_return\": 7,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-goal",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-goal"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Goal",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 11,\n    \"years_left\": 9\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user-goal/:goal_id",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "user-goal",
+                                ":goal_id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "goal_id",
+                                    "value": "ENTER_FINSYS_GOAL_ID"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8080/api/v1",
+            "type": "string"
+        }
+    ]
+}

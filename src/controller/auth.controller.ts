@@ -1,0 +1,233 @@
+import { NextFunction, Request, Response } from "express";
+import logger from "../middleware/logger.js";
+import { auth_service } from "../services/auth.service.js";
+import AppError from "../middleware/error.middleware.js";
+import { user_service } from "../services/user.service.js";
+import { generate_JWT } from "../middleware/jwt.js";
+
+class AuthControllerClass {
+
+    private extract_device_params(req: Request) {
+        const dtyp = req.query.dtyp as "A" | "I";
+        const dver = req.query.dver as string;
+        const dbn = req.query.dbn as string;
+        const did = req.query.did as string;
+
+        return {
+            dtyp: dtyp,
+            dver: dver,
+            dbn: dbn,
+            did: did,
+        };
+    }
+
+    auth_req_otp = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            // Required Query Params
+            logger.debug("Extracting device parameters for OTP request  ==> ", req.query);
+            const device_params = this.extract_device_params(req);
+
+            // Optional Query Params
+            const mob = req.query.mob as string || "";
+
+            if (!mob) {
+                logger.error("Mobile number is required for OTP request");
+                throw new AppError("Mobile number is required", 400, "NOT_MOBILE_PROVIDED");
+            }
+
+            logger.info(`OTP Request for Mobile: ${mob}, Device: ${device_params.did}`);
+            const auth_res: { code: number } = await auth_service.req_otp(mob, device_params);
+
+            if (auth_res.code !== 1) {
+                throw new AppError("Failed to request OTP", 500, "OTP_REQUEST_FAILED");
+            }
+
+            const user = await user_service.create_user({
+                phone_no: mob
+            })
+
+            logger.debug("User record ensured/created with ID: ", user.id);
+
+
+            res.status(200).json({
+                success: true,
+                message: "OTP requested successfully",
+                data: {
+                    user_id: user.id,
+                    phone_no: user.phone_no
+                }
+            });
+            return;
+
+
+        } catch (error) {
+            logger.error("Error in auth_req_otp:", error);
+            next(error);
+            return;
+        }
+    }
+
+    auth_validate_otp = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const device_params = this.extract_device_params(req);
+
+            const mob = req.body.mob as string;
+            const otp = req.body.otp as string;
+
+            if (!mob || !otp) {
+                logger.error("Mobile number and OTP are required for OTP validation");
+                throw new AppError("Mobile number and OTP are required", 400, "NOT_MOBILE_OR_OTP_PROVIDED");
+            }
+
+            const user = await user_service.get_user_by_phone(mob);
+            if (!user) {
+                logger.error("User not found for mobile number during OTP validation");
+                throw new AppError("User not found, Sign up first", 404, "USER_NOT_FOUND");
+            }
+
+            logger.info(`Validating OTP for Mobile: ${mob}, Device: ${device_params.did}`);
+            const auth_res = await auth_service.validate_otp(mob, otp, device_params);
+
+
+            if (auth_res.code !== 1) {
+                throw new AppError("OTP validation failed", 401, "OTP_VALIDATION_FAILED");
+            }
+
+            const updated_user = await user_service.update_user(user.id, {
+                usr: auth_res.results[0].usr,
+                pwd: auth_res.results[0].pwd,
+                inv_id: auth_res.results[0].invid
+            });
+
+            const token = generate_JWT(updated_user);
+
+            res.status(200).json({
+                success: true,
+                message: "OTP validated successfully",
+                data: {
+                    user: {
+                        user_id: updated_user.id,
+                        phone_no: updated_user.phone_no,
+                    },
+                    token: token,
+                }
+            });
+            return;
+
+        } catch (error) {
+            logger.error("Error in auth_validate_otp:", error);
+            next(error);
+            return;
+        }
+    }
+
+    auth_login_invId = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const device_params = this.extract_device_params(req);
+
+            const inv_id = req.body.inv_id as string;
+
+            if (!inv_id) {
+                logger.error("Invoice ID is required for login");
+                throw new AppError("Invoice ID is required", 400, "NOT_INV_ID_PROVIDED");
+            }
+
+            const user = await user_service.get_user_by_invId(inv_id);
+            if (!user) {
+                logger.error("User not found for inv Id during login");
+                throw new AppError("User not found, Sign up first", 404, "USER_NOT_FOUND");
+            }
+
+            logger.info(`Login Attempt for User with InvId: ${inv_id}, Device: ${device_params.did}`);
+            const auth_res = await auth_service.login_invId(user.phone_no || "", "", inv_id, device_params);
+
+
+            if (auth_res.code !== 1) {
+                throw new AppError("OTP validation failed", 401, "OTP_VALIDATION_FAILED");
+            }
+
+            const updated_user = await user_service.update_user(user.id, {
+                usr: auth_res.results.usr,
+                pwd: auth_res.results.pwd,
+                inv_id: auth_res.results.invid
+            });
+
+            const token = generate_JWT(updated_user);
+
+            res.status(200).json({
+                success: true,
+                message: "Login successful",
+                data: {
+                    user: {
+                        user_id: updated_user.id,
+                        phone_no: updated_user.phone_no,
+                    },
+                    token: token,
+                }
+            });
+            return;
+
+        } catch (error) {
+            logger.error("Error in auth_login_invId:", error);
+            next(error);
+            return;
+        }
+    }
+
+    auth_login_creds = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const device_params = this.extract_device_params(req);
+
+            const usr = req.body.usr as string || "";
+            const pwd = req.body.pwd as string || "";
+            if (!usr || !pwd) {
+                logger.error("Username and Password are required for login");
+                throw new AppError("Username and Password are required", 400, "NOT_CREDENTIALS_PROVIDED");
+            }
+
+            const user = await user_service.get_user_by_usr(usr);
+            if (!user) {
+                logger.error("User not found for username during login");
+                throw new AppError(`User not found for username : ${usr}`, 404, "USER_NOT_FOUND");
+            }
+
+            logger.info(`Login Attempt for User: ${usr}, Device: ${device_params.did}`);
+
+            const auth_res = await auth_service.login_creds(usr, pwd, device_params);
+            if (auth_res.code !== 1) {
+                throw new AppError("OTP validation failed", 401, "OTP_VALIDATION_FAILED");
+            }
+
+            const updated_user = await user_service.update_user(user.id, {
+                usr: auth_res.results.usr,
+                pwd: auth_res.results.pwd,
+                inv_id: auth_res.results.invid
+            });
+
+            const token = generate_JWT(updated_user);
+
+            res.status(200).json({
+                success: true,
+                message: "OTP validated successfully",
+                data: {
+                    user: {
+                        user_id: updated_user.id,
+                        phone_no: updated_user.phone_no,
+                    },
+                    token: token,
+                }
+            });
+            return;
+
+        } catch (error) {
+            logger.error("Error in auth_login_creds:", error);
+            next(error);
+            return;
+        }
+    }
+}
+
+export const auth_controller = new AuthControllerClass();

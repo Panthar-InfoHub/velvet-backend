@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",               // ≥ ES2017; ES2022 has native TLA support
+    "module": "NodeNext",             // ESM with Node-style resolution
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,          // for single-file transpilation
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+  },
+  "include": ["src"]
+}
+

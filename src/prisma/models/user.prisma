@@ -1,0 +1,31 @@
+/**
+ * User Model
+ * meta_data {
+ * onboarding_stage : number
+ * is_onboarding_complete : number
+ * }
+ */
+
+model User {
+    id        String    @id @default(uuid())
+    full_name String?
+    inv_id    String?   @unique
+    usr       String?   @unique
+    pwd       String?   @db.Text
+    email     String?   @unique
+    phone_no  String?   @unique
+    city      String?
+    dob       DateTime?
+    fcm_token String?   @db.Text
+    meta_data Json?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    // Relations
+    user_finance   UserFinance?
+    user_assets    UserAssets?
+    user_insurance UserInsurance?
+    user_loan      UserLoan[]
+    user_goals     UserGoals[]
+}

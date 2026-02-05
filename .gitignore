@@ -1,0 +1,11 @@
+.env
+node_modules/
+dist/
+/src/prisma/generated/
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/
+
+TODO.md
