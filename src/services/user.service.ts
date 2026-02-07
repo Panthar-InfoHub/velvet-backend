@@ -36,7 +36,7 @@ class UserServiceClass {
         });
     }
 
-    async get_user_by_invId(inv_id: string) {
+    async get_user_by_invId(inv_id: number) {
         return await db.user.findUnique({
             where: {
                 inv_id: inv_id

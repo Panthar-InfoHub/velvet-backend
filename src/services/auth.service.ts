@@ -38,7 +38,7 @@ class AuthServiceClass {
     login_invId = async (
         mobile: string,
         otp: string,
-        invid: string,
+        invid: number,
         device: DeviceDetails
     ): Promise<AuthResponse> => {
         const res = await axios.get(this.finsys_api, {

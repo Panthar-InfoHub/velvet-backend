@@ -128,7 +128,7 @@ class AuthControllerClass {
 
             const device_params = this.extract_device_params(req);
 
-            const inv_id = req.body.inv_id as string;
+            const inv_id = req.body.inv_id as number;
 
             if (!inv_id) {
                 logger.error("Invoice ID is required for login");

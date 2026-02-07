@@ -9,7 +9,7 @@
 model User {
     id        String    @id @default(uuid())
     full_name String?
-    inv_id    String?   @unique
+    inv_id    Int?      @unique
     usr       String?   @unique
     pwd       String?   @db.Text
     email     String?   @unique
