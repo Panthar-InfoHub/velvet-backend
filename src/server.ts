@@ -15,6 +15,7 @@ import { user_assets_router } from "./routes/user.assets.router.js"
 import { user_insurance_router } from "./routes/user.insurance.router.js"
 import { user_goal_router } from "./routes/user.goal.router.js"
 import { auth_router } from "./routes/auth.router.js"
+import { job_router } from "./routes/job.router.js"
 
 
 //Configurations
@@ -42,6 +43,7 @@ if (process.env.ENVIRONMENT === "dev") {
 
 app.use("/api/v1/auth", auth_router)
 app.use("/api/v1/user", user_router)
+app.use("/api/v1/jobs", job_router)
 app.use("/api/v1/onboarding", onboarding_router)
 app.use("/api/v1/user-assets", user_assets_router)
 app.use("/api/v1/user-finance", user_finance_router)
