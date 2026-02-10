@@ -20,13 +20,83 @@ class JobControllerClass {
 
             await mututal_funds_service.daily_mf_product_job();
 
-        } catch (error) {
-            logger.error("Error while running daily mf job ==> ", error);
+            res.status(200).json({
+                success: true,
+                message: "Daily mutual fund job completed successfully"
+            })
+            return;
+
+        } catch (error: any) {
+            console.error("Error while running daily mf job ==> ", error.message);
+            // logger.error("Error while running daily mf job ==> ", error.message);
             next(error);
             return;
         }
     }
 
+
+    mf_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+
+            if (scheduler_token !== secret) {
+                console.warn(`[SECURITY] Unauthorized attempt to access mf nav history job with token: ${scheduler_token}`);
+                throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
+            }
+
+            logger.info("Running mf nav history job...");
+
+            await mututal_funds_service.nav_history_job();
+
+            res.status(200).json({
+                success: true,
+                message: "MF NAV history job completed successfully"
+            })
+            return;
+
+        } catch (error: any) {
+            console.error("Error while running mf nav history job ==> ", error.message);
+    // logger.error("Error while running mf nav history job ==> ", error.message);
+            next(error);
+            return;
+        }
+    }
+
+
+    mf_single_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const scheme_code = req.params.scheme_code as string;
+
+            logger.info(`Running single nav history job for scheme code: ${scheme_code}...`);
+
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+
+            if (scheduler_token !== secret) {
+                console.warn(`[SECURITY] Unauthorized attempt to access mf single nav history job with token: ${scheduler_token}`);
+                throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
+            }
+
+            logger.info("Running mf single nav history job...");
+
+            await mututal_funds_service.single_nav_history_job(scheme_code);
+
+            res.status(200).json({
+                success: true,
+                message: "MF NAV history job completed successfully"
+            })
+            return;
+
+        } catch (error: any) {
+            console.error("Error while running mf nav history job ==> ", error.message);
+            // logger.error("Error while running mf nav history job ==> ", error.message);
+            next(error);
+            return;
+        }
+    }
 }
 
 export const job_controller = new JobControllerClass();

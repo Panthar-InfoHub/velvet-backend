@@ -99,7 +99,7 @@ export const errorHandler: ErrorRequestHandler = (
     }
 
     if (!error.isOperational) {
-        logger.error("UNEXPECTED ERROR:", err);
+        // logger.error("UNEXPECTED ERROR:", err);
     }
 
     // 3. Unified response

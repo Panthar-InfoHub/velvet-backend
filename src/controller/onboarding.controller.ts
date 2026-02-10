@@ -7,6 +7,7 @@ import { user_goal_controller } from "./user.goal.controller.js";
 import { user_insurance_controller } from "./user.insurance.controller.js";
 import { user_service } from "../services/user.service.js";
 import { user_controller } from "./user.controller.js";
+import logger from "../middleware/logger.js";
 
 interface StepController {
     onboarding_create: (req: Request) => Promise<any>;
@@ -16,7 +17,7 @@ interface StepController {
 
 class OnBoardingControllerClass {
 
-    private get_controller_class(step: number): StepController {
+    private get_controller_class = (step: number): StepController => {
         switch (step) {
             case 1:
                 return user_controller
@@ -42,7 +43,7 @@ class OnBoardingControllerClass {
      * Returns : Success / Failure response
      *  */
 
-    async complete_step(req: Request, res: Response, next: NextFunction) {
+    complete_step = async (req: Request, res: Response, next: NextFunction) => {
         try {
 
             const data = req.body;
@@ -56,6 +57,8 @@ class OnBoardingControllerClass {
 
             await controller_class.onboarding_create(req);
 
+            logger.debug("Onboarding step completed... Updating user meta data");
+
             // Update user meta data for onboarding step completion
             await user_service.update_user(req.user!.id, {
                 meta_data: {
@@ -63,6 +66,15 @@ class OnBoardingControllerClass {
                     is_onboarding_completed: current_step >= 6 ? true : false
                 }
             });
+
+            res.status(200).json({
+                success: true,
+                message: "Onboarding step completed successfully",
+                data: {
+                    current_onboarding_step: current_step,
+                    is_onboarding_completed: current_step >= 6 ? true : false
+                }
+            })
 
         } catch (error) {
             console.error("Error in complete_step:", error);

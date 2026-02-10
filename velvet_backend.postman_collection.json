@@ -1,589 +1,1198 @@
 {
-    "info": {
-        "_postman_id": "7f8a7d3b-8c2e-4e5a-9b1c-3d2f1a0b9c8d",
-        "name": "Velvet Backend API",
-        "description": "API collection for Velvet Backend project including onboarding, finance, assets, loans, insurance, and goals.",
-        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-    },
+"info": {
+    "_postman_id": "b30dd101-961e-4acf-963b-a6fede0c30a7",
+    "name": "Velvet Backend API",
+    "description": "API collection for Velvet Backend project including onboarding, finance, assets, loans, insurance, goals, and scheduled jobs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+},
+"item": [
+    {
+        "name": "Auth",
+    "description": "## Request\n- Params: none (path params are defined per request)\n- Query params: dtyp (A|I), dver, dbn, did, mob (req-otp)\n- Auth: none\n\n## Error info\n- Auth or validation errors are returned by the upstream service.",
     "item": [
         {
-            "name": "Auth",
-            "item": [
-                {
-                    "name": "Request OTP",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"mob\": \"9999999999\"\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/auth/req-otp",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "auth",
-                                "req-otp"
-                            ]
+            "name": "Request OTP",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"mob\": \"9999999999\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
                         }
-                    },
-                    "response": []
+                    }
+                },
+                "url": {
+            "raw": "{{base_url}}/auth/req-otp?dtyp=A&dver=14.0&dbn=17&did=01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567&mob=9026705787",
+            "host": [
+                "{{base_url}}"
+            ],
+            "path": [
+                "auth",
+                "req-otp"
+            ],
+            "query": [
+                {
+                    "key": "dtyp",
+                    "value": "A",
+                    "description": "A | I"
                 },
                 {
-                    "name": "Validate OTP",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"mob\": \"9999999999\",\n    \"otp\": \"123456\"\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/auth/validate-otp",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "auth",
-                                "validate-otp"
-                            ]
+                    "key": "dver",
+                    "value": "14.0"
+                },
+                {
+                    "key": "dbn",
+                    "value": "17"
+                },
+                {
+                    "key": "did",
+                    "value": "01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567"
+                },
+                {
+                    "key": "mob",
+                    "value": "9026705787"
+                }
+            ]
+            },
+            "description": "Method: POST\nParams: dtyp (A|I), dver, dbn, did, mob\nBody: mob (string)\nResponse: { \"success\": true, \"message\": \"OTP requested\", \"data\": { \"code\": 1 } }"
+        },
+        "response": [
+            {
+                "name": "OTP Requested",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                }
+            ],
+            "body": "{\n  \"success\": true,\n  \"message\": \"OTP requested\",\n  \"data\": {\n    \"code\": 1\n  }\n}"
+        }
+    ]
+        },
+        {
+            "name": "Validate OTP",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"mob\": \"9026705787\",\n    \"otp\": \"4050\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
                         }
-                    },
-                    "response": []
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/auth/validate-otp?dtyp=A&dver=14.0&dbn=17&did=01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "auth",
+                        "validate-otp"
+                    ],
+                    "query": [
+                        {
+                            "key": "dtyp",
+                            "value": "A"
+                        },
+                        {
+                            "key": "dver",
+                            "value": "14.0"
+                        },
+                        {
+                            "key": "dbn",
+                            "value": "17"
+                        },
+                        {
+                            "key": "did",
+                            "value": "01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567"
+                        }
+                    ]
+                },
+                "description": "Method: POST\nParams: dtyp (A|I), dver, dbn, did\nBody: mob (string), otp (string)\nResponse: { \"success\": true, \"message\": \"OTP validated successfully\", \"data\": { \"code\": 1, \"results\": [ ... ] } }"
+            },
+        "response": [
+            {
+                "name": "Validate OTP",
+            "status": "OK",
+            "code": 200,
+            "header": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                }
+            ],
+            "body": "{\n  \"success\": true,\n  \"message\": \"OTP validated successfully\",\n  \"data\": {\n    \"code\": 1,\n    \"results\": [\n      {\n        \"invid\": 66,\n        \"usr\": \"9026705787\",\n        \"pwd\": \"710552\"\n      }\n    ]\n  }\n}"
+        }
+    ]
+},
+{
+    "name": "Usr Pwd Login",
+        "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+                "mode": "raw",
+            "raw": "{\n    \"usr\": \"9026705339\",\n    \"pwd\": \"710552\"\n}",
+            "options": {
+                "raw": {
+                    "language": "json"
+                }
+            }
+        },
+        "url": {
+            "raw": "{{base_url}}/auth/login-creds?dtyp=A&dver=14.0&dbn=17&did=01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567",
+            "host": [
+                "{{base_url}}"
+            ],
+            "path": [
+                "auth",
+                "login-creds"
+            ],
+            "query": [
+                {
+                    "key": "dtyp",
+                    "value": "A"
+                },
+                {
+                    "key": "dver",
+                    "value": "14.0"
+                },
+                {
+                    "key": "dbn",
+                    "value": "17"
+                },
+                {
+                    "key": "did",
+                    "value": "01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567"
                 }
             ]
         },
+        "description": "Method: POST\nParams: dtyp (A|I), dver, dbn, did\nBody: usr (string), pwd (string)\nResponse: { \"success\": true, \"message\": \"Login successful\", \"data\": { \"code\": 1 } }"
+    },
+    "response": [
         {
-            "name": "General",
-            "item": [
+            "name": "Login Successful",
+            "status": "OK",
+            "code": 200,
+            "header": [
                 {
-                    "name": "Ping",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/ping",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "ping"
-                            ]
-                        }
-                    },
-                    "response": []
+                    "key": "Content-Type",
+                    "value": "application/json"
                 }
-            ]
+            ],
+            "body": "{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"code\": 1\n  }\n}"
+        }
+    ]
         },
         {
-            "name": "Onboarding",
-            "item": [
-                {
-                    "name": "Complete Step",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"current_step\": 2,\n    \"annual_income\": 1200000,\n    \"expense_house\": 25000,\n    \"expense_food\": 15000,\n    \"expense_transportation\": 10000,\n    \"expense_others\": 5000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/onboarding/complete-step",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "onboarding",
-                                "complete-step"
-                            ]
+            "name": "Inv Id Login",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"inv_id\": \"your_inv_id\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
                         }
-                    },
-                    "response": []
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/auth/login-invId?dtyp=A&dver=14.0&dbn=17&did=01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "auth",
+                        "login-invId"
+                    ],
+                    "query": [
+                        {
+                            "key": "dtyp",
+                            "value": "A"
+                        },
+                        {
+                            "key": "dver",
+                            "value": "14.0"
+                        },
+                        {
+                            "key": "dbn",
+                            "value": "17"
+                        },
+                        {
+                            "key": "did",
+                            "value": "01b277014fcca255be037b353b4bbbe396da6faae7704f69ccbb5962133g567"
                 }
             ]
+            },
+            "description": "Method: POST\nParams: dtyp (A|I), dver, dbn, did\nBody: inv_id (string)\nResponse: { \"success\": true, \"message\": \"Login successful\", \"data\": { \"code\": 1 } }"
         },
-        {
-            "name": "User Finance",
-            "item": [
-                {
-                    "name": "Create Finance",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"annual_income\": 1500000,\n    \"expense_house\": 30000,\n    \"expense_food\": 20000,\n    \"expense_transportation\": 12000,\n    \"expense_others\": 8000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-finance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-finance"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Update Finance",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"annual_income\": 1600000,\n    \"expense_house\": 35000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-finance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-finance"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Get Finance",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-finance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-finance"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Delete Finance",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-finance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-finance"
-                            ]
-                        }
-                    },
-                    "response": []
-                }
-            ]
-        },
-        {
-            "name": "User Assets",
-            "item": [
-                {
-                    "name": "Create Assets",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"mututal_funds\": 500000,\n    \"stocks\": 200000,\n    \"fd\": 100000,\n    \"real_estate\": 5000000,\n    \"gold\": 300000,\n    \"cash_saving\": 50000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-assets",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-assets"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Update Assets",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"stocks\": 250000,\n    \"gold\": 350000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-assets",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-assets"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Get Assets",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-assets",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-assets"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Delete Assets",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-assets",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-assets"
-                            ]
-                        }
-                    },
-                    "response": []
-                }
-            ]
-        },
-        {
-            "name": "User Loan",
-            "item": [
-                {
-                    "name": "Create Loan",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"loan_type\": \"Home Loan\",\n    \"loan_name\": \"SBI Home Loan\",\n    \"outstanding_amount\": 4500000,\n    \"monthly_emi\": 45000,\n    \"tenure_months\": 240\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-loan",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-loan"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Update Loan",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"outstanding_amount\": 4400000,\n    \"monthly_emi\": 45000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-loan/:loan_id",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-loan",
-                                ":loan_id"
-                            ],
-                            "variable": [
-                                {
-                                    "key": "loan_id",
-                                    "value": "ENTER_LOAN_ID"
-                                }
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Get All Loans",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-loan?page=1&limit=50",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-loan"
-                            ],
-                            "query": [
-                                {
-                                    "key": "page",
-                                    "value": "1"
-                                },
-                                {
-                                    "key": "limit",
-                                    "value": "50"
-                                }
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Get Loan By ID",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-loan/:loan_id",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-loan",
-                                ":loan_id"
-                            ],
-                            "variable": [
-                                {
-                                    "key": "loan_id",
-                                    "value": "ENTER_LOAN_ID"
-                                }
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Delete Loan",
-                    "request": {
-                        "method": "DELETE",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-loan/:loan_id",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-loan",
-                                ":loan_id"
-                            ],
-                            "variable": [
-                                {
-                                    "key": "loan_id",
-                                    "value": "ENTER_LOAN_ID"
-                                }
-                            ]
-                        }
-                    },
-                    "response": []
-                }
-            ]
-        },
-        {
-            "name": "User Insurance",
-            "item": [
-                {
-                    "name": "Create/Update Insurance",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"life_insurance\": 10000000,\n    \"health_insurance\": 500000\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-insurance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-insurance"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Get Insurance",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/user-insurance",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-insurance"
-                            ]
-                        }
-                    },
-                    "response": []
-                }
-            ]
-        },
-        {
-            "name": "User Goal",
-            "item": [
-                {
-                    "name": "Create Child Education Goal",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 10,\n    \"years_left\": 10,\n    \"current_goal_cost\": 25,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-goal",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-goal"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Create Retirement Goal",
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"goal_type_id\": 3,\n    \"current_age\": 40,\n    \"retirement_age\": 60,\n    \"life_expectancy\": 80,\n    \"current_monthly_expense\": 100000,\n    \"post_retirement_return\": 7,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-goal",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-goal"
-                            ]
-                        }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Update Goal",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 11,\n    \"years_left\": 9\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/user-goal/:goal_id",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "user-goal",
-                                ":goal_id"
-                            ],
-                            "variable": [
-                                {
-                                    "key": "goal_id",
-                                    "value": "ENTER_FINSYS_GOAL_ID"
-                                }
-                            ]
-                        }
-                    },
-                    "response": []
-                }
-            ]
+        "response": [
+            {
+                "name": "Login Successful",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"code\": 1\n  }\n}"
+            }
+        ]
         }
     ],
-    "variable": [
+    "auth": {
+        "type": "noauth"
+    }
+    },
+    {
+    "name": "Server Health",
+    "description": "## Request\n- Params: none\n- Query params: none\n- Auth: none\n\n## Error info\n- Server errors return 5xx responses.",
+    "item": [
         {
-            "key": "base_url",
-            "value": "http://localhost:8080/api/v1",
+            "name": "Ping",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/ping",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "ping"
+                    ]
+            },
+            "description": "Method: GET\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Service is running...\" }"
+        },
+        "response": [
+            {
+                "name": "Ping",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Service is running...\"\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "Onboarding",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| current_step | number | yes | 2=Finance, 3=Assets, 4=Insurance, 5=Loans, 6=Goals |\n\n## Request\n- Params: none\n- Query params: none\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for missing or invalid step payload.",
+    "item": [
+        {
+            "name": "Complete Step",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+            "raw": "{\n    \"current_step\": 6,\n    \"goal_type_id\": 4,\n    \"goal_item_id\": 5,\n    \"goal_name\": \"This is my dream goal\",\n    \"years_left\": 2,\n    \"current_goal_cost\": 1000000,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
+            "options": {
+                "raw": {
+                    "language": "json"
+                }
+            }
+        },
+        "url": {
+            "raw": "{{base_url}}/onboarding/complete-step",
+            "host": [
+                "{{base_url}}"
+            ],
+            "path": [
+                "onboarding",
+                "complete-step"
+            ]
+            },
+            "description": "Method: POST\nParams: none\nBody: current_step (number) + step-specific schema\nResponse: { \"success\": true, \"message\": \"Onboarding step completed successfully\", \"data\": { \"current_onboarding_step\": 6, \"is_onboarding_completed\": false } }"
+        },
+        "response": [
+            {
+                "name": "Step Completed",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Onboarding step completed successfully\",\n  \"data\": {\n    \"current_onboarding_step\": 6,\n    \"is_onboarding_completed\": false\n  }\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "User Finance",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| annual_income | number | no | >= 0 |\n| expense_house | number | no | >= 0 |\n| expense_food | number | no | >= 0 |\n| expense_transportation | number | no | >= 0 |\n| expense_others | number | no | >= 0 |\n\n## Request\n- Params: none\n- Query params: none\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for invalid numeric input.",
+    "item": [
+        {
+            "name": "Create Finance",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"annual_income\": 1500000,\n    \"expense_house\": 30000,\n    \"expense_food\": 20000,\n    \"expense_transportation\": 12000,\n    \"expense_others\": 8000\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/user-finance",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "user-finance"
+                    ]
+            },
+            "description": "Method: POST\nParams: none\nBody: annual_income?, expense_house?, expense_food?, expense_transportation?, expense_others?\nResponse: { \"success\": true, \"message\": \"Finance details created successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Create Finance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Finance details created successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\",\n    \"annual_income\": 1500000\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Update Finance",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n    \"annual_income\": 1600000,\n    \"expense_house\": 35000\n}",
+                "options": {
+                    "raw": {
+                        "language": "json"
+                    }
+                }
+            },
+            "url": {
+                "raw": "{{base_url}}/user-finance",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-finance"
+                ]
+            },
+            "description": "Method: PATCH\nParams: none\nBody: annual_income?, expense_house?, expense_food?, expense_transportation?, expense_others?\nResponse: { \"success\": true, \"message\": \"Finance details updated successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Update Finance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Finance details updated successfully\",\n  \"data\": {\n    \"annual_income\": 1600000\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Get Finance",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-finance",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-finance"
+                ]
+            },
+            "description": "Method: GET\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Finance details fetched successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Get Finance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Finance details fetched successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Delete Finance",
+        "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-finance",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-finance"
+                ]
+            },
+            "description": "Method: DELETE\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Finance details deleted successfully\" }"
+        },
+        "response": [
+            {
+                "name": "Delete Finance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Finance details deleted successfully\"\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "User Assets",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| mututal_funds | number | no | >= 0 |\n| stocks | number | no | >= 0 |\n| fd | number | no | >= 0 |\n| real_estate | number | no | >= 0 |\n| gold | number | no | >= 0 |\n| cash_saving | number | no | >= 0 |\n\n## Request\n- Params: none\n- Query params: none\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for invalid numeric input.",
+    "item": [
+        {
+            "name": "Create Assets",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"mututal_funds\": 500000,\n    \"stocks\": 200000,\n    \"fd\": 100000,\n    \"real_estate\": 5000000,\n    \"gold\": 300000,\n    \"cash_saving\": 50000\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/user-assets",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "user-assets"
+                    ]
+            },
+            "description": "Method: POST\nParams: none\nBody: mututal_funds?, stocks?, fd?, real_estate?, gold?, cash_saving?\nResponse: { \"success\": true, \"message\": \"Asset details created successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Create Assets",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Asset details created successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Update Assets",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n    \"stocks\": 250000,\n    \"gold\": 350000\n}",
+                "options": {
+                    "raw": {
+                        "language": "json"
+                    }
+                }
+            },
+            "url": {
+                "raw": "{{base_url}}/user-assets",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-assets"
+                ]
+            },
+            "description": "Method: PATCH\nParams: none\nBody: mututal_funds?, stocks?, fd?, real_estate?, gold?, cash_saving?\nResponse: { \"success\": true, \"message\": \"Asset details updated successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Update Assets",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Asset details updated successfully\",\n  \"data\": {\n    \"stocks\": 250000\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Get Assets",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-assets",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-assets"
+                ]
+            },
+            "description": "Method: GET\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Asset details fetched successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Get Assets",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Asset details fetched successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Delete Assets",
+        "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-assets",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-assets"
+                ]
+            },
+            "description": "Method: DELETE\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Asset details deleted successfully\" }"
+        },
+        "response": [
+            {
+                "name": "Delete Assets",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Asset details deleted successfully\"\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "User Loan",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| loan_type | string | yes | Example: Home Loan |\n| loan_name | string | no | Optional label |\n| outstanding_amount | number | yes | >= 0 |\n| monthly_emi | number | yes | >= 0 |\n| tenure_months | number | yes | int, >= 1 |\n\n## Request\n- Params: loan_id (path for update/get/delete)\n- Query params: page, limit (get all)\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for missing or invalid fields.",
+    "item": [
+        {
+            "name": "Create Loan",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"loan_type\": \"Home Loan\",\n    \"loan_name\": \"SBI Home Loan\",\n    \"outstanding_amount\": 4500000,\n    \"monthly_emi\": 45000,\n    \"tenure_months\": 240\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/user-loan",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "user-loan"
+                    ]
+            },
+            "description": "Method: POST\nParams: none\nBody: loan_type, loan_name?, outstanding_amount, monthly_emi, tenure_months\nResponse: { \"success\": true, \"message\": \"Loan created successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Create Loan",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Loan created successfully\",\n  \"data\": {\n    \"loan_type\": \"Home Loan\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Update Loan",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n    \"outstanding_amount\": 4400000,\n    \"monthly_emi\": 45000\n}",
+                "options": {
+                    "raw": {
+                        "language": "json"
+                    }
+                }
+            },
+            "url": {
+                "raw": "{{base_url}}/user-loan/:loan_id",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-loan",
+                    ":loan_id"
+                ],
+                "variable": [
+                    {
+                        "key": "loan_id",
+                        "value": "ENTER_LOAN_ID"
+                    }
+                ]
+            },
+            "description": "Method: PATCH\nParams: loan_id (path)\nBody: loan_type?, loan_name?, outstanding_amount?, monthly_emi?, tenure_months?\nResponse: { \"success\": true, \"message\": \"Loan updated successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Update Loan",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Loan updated successfully\",\n  \"data\": {\n    \"outstanding_amount\": 4400000\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Get All Loans",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-loan?page=1&limit=50",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-loan"
+                ],
+                "query": [
+                    {
+                        "key": "page",
+                        "value": "1"
+                    },
+                    {
+                        "key": "limit",
+                        "value": "50"
+                    }
+                ]
+            },
+            "description": "Method: GET\nParams: page (query), limit (query)\nBody: none\nResponse: { \"success\": true, \"message\": \"Loans fetched successfully\", \"data\": { \"loans\": [ ... ], \"pagination\": { ... } } }"
+        },
+        "response": [
+            {
+                "name": "Get All Loans",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Loans fetched successfully\",\n  \"data\": {\n    \"loans\": [],\n    \"pagination\": {\n      \"total_loans\": 0,\n      \"current_page\": 1,\n      \"limit\": 50,\n      \"total_pages\": 0\n    }\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Get Loan By ID",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-loan/:loan_id",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-loan",
+                    ":loan_id"
+                ],
+                "variable": [
+                    {
+                        "key": "loan_id",
+                        "value": "ENTER_LOAN_ID"
+                    }
+                ]
+            },
+            "description": "Method: GET\nParams: loan_id (path)\nBody: none\nResponse: { \"success\": true, \"message\": \"Loan fetched successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Get Loan By ID",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Loan fetched successfully\",\n  \"data\": {\n    \"id\": \"LOAN_ID\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Delete Loan",
+        "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-loan/:loan_id",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-loan",
+                    ":loan_id"
+                ],
+                "variable": [
+                    {
+                        "key": "loan_id",
+                        "value": "ENTER_LOAN_ID"
+                    }
+                ]
+            },
+            "description": "Method: DELETE\nParams: loan_id (path)\nBody: none\nResponse: { \"success\": true, \"message\": \"Loan deleted successfully\" }"
+        },
+        "response": [
+            {
+                "name": "Delete Loan",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Loan deleted successfully\"\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "User Insurance",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| life_insurance | number | no | >= 0 |\n| health_insurance | number | no | >= 0 |\n\n## Request\n- Params: none\n- Query params: none\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for invalid numeric input.",
+    "item": [
+        {
+            "name": "Create/Update Insurance",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"life_insurance\": 10000000,\n    \"health_insurance\": 500000\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/user-insurance",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "user-insurance"
+                    ]
+            },
+            "description": "Method: POST\nParams: none\nBody: life_insurance?, health_insurance?\nResponse: { \"success\": true, \"message\": \"Insurance details saved successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Save Insurance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Insurance details saved successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Get Insurance",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/user-insurance",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-insurance"
+                ]
+            },
+            "description": "Method: GET\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Insurance details fetched successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Get Insurance",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Insurance details fetched successfully\",\n  \"data\": {\n    \"user_id\": \"USER_ID\"\n  }\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "User Goal",
+    "description": "## Schema\n| Field | Type | Required | Notes |\n| --- | --- | --- | --- |\n| goal_type_id | number | yes | 1/2=Child, 3=Retirement, 4=Item |\n| inflation_rate | number | yes | >= 0 |\n| return_rate | number | yes | >= 0 |\n| current_saved_amount | number | yes | >= 0 |\n| child_name | string | req for 1/2 | Child name |\n| child_age | number | req for 1/2 | >= 0 |\n| years_left | number | req for 1/2/4 | >= 1 |\n| current_goal_cost | number | req for 1/2/4 | >= 1 |\n| current_age | number | req for 3 | >= 18 |\n| retirement_age | number | req for 3 | >= 18 |\n| life_expectancy | number | req for 3 | >= 18 |\n| current_monthly_expense | number | req for 3 | >= 1 |\n| post_retirement_return | number | req for 3 | >= 0 |\n| goal_name | string | req for 4 | Item name |\n| goal_item_id | number | req for 4 | 1-4, 5=Other |\n\n## Request\n- Params: goal_id (path for update)\n- Query params: none\n- Auth: bearer (from collection auth)\n\n## Error info\n- Validation errors returned for missing conditional fields.",
+    "item": [
+        {
+            "name": "Create Child Education Goal",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 10,\n    \"years_left\": 10,\n    \"current_goal_cost\": 25,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/user-goal",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "user-goal"
+                    ]
+            },
+            "description": "Method: POST\nParams: none\nBody: goal_type_id=1 + child fields + shared fields\nResponse: { \"success\": true, \"message\": \"Goal created successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Create Child Goal",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Goal created successfully\",\n  \"data\": {\n    \"gid\": \"55\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Create Retirement Goal",
+        "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n    \"goal_type_id\": 3,\n    \"current_age\": 40,\n    \"retirement_age\": 60,\n    \"life_expectancy\": 80,\n    \"current_monthly_expense\": 100000,\n    \"post_retirement_return\": 7,\n    \"inflation_rate\": 7,\n    \"return_rate\": 12,\n    \"current_saved_amount\": 0\n}",
+                "options": {
+                    "raw": {
+                        "language": "json"
+                    }
+                }
+            },
+            "url": {
+                "raw": "{{base_url}}/user-goal",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-goal"
+                ]
+            },
+            "description": "Method: POST\nParams: none\nBody: goal_type_id=3 + retirement fields + shared fields\nResponse: { \"success\": true, \"message\": \"Goal created successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Create Retirement Goal",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Goal created successfully\",\n  \"data\": {\n    \"gid\": \"57\"\n  }\n}"
+            }
+        ]
+    },
+    {
+        "name": "Update Goal",
+        "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+                "mode": "raw",
+                "raw": "{\n    \"goal_type_id\": 1,\n    \"child_name\": \"Sumit\",\n    \"child_age\": 11,\n    \"years_left\": 9\n}",
+                "options": {
+                    "raw": {
+                        "language": "json"
+                    }
+                }
+            },
+            "url": {
+                "raw": "{{base_url}}/user-goal/:goal_id",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "user-goal",
+                    ":goal_id"
+                ],
+                "variable": [
+                    {
+                        "key": "goal_id",
+                        "value": "ENTER_FINSYS_GOAL_ID"
+                    }
+                ]
+            },
+            "description": "Method: PATCH\nParams: goal_id (path)\nBody: goal_type_id + relevant fields\nResponse: { \"success\": true, \"message\": \"Goal updated successfully\", \"data\": { ... } }"
+        },
+        "response": [
+            {
+                "name": "Update Goal",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Goal updated successfully\",\n  \"data\": {\n    \"gid\": \"55\"\n  }\n}"
+            }
+        ]
+    }
+]
+},
+{
+"name": "Do Not Touch",
+"description": "## Request\n- Params: scheme_code (path for mf-single-nav)\n- Query params: none\n- Auth: x-scheduler-token header required\n\n## Error info\n- Unauthorized errors returned when scheduler token is missing or invalid.",
+"item": [
+    {
+        "name": "Daily Job : MF",
+        "request": {
+            "method": "POST",
+            "header": [
+                {
+                    "key": "x-scheduler-token",
+                    "value": "velvet_scheduler_secret_001",
+                    "type": "text"
+                }
+            ],
+            "url": {
+                "raw": "{{base_url}}/jobs/mf-daily",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "jobs",
+                    "mf-daily"
+                ]
+            },
+            "description": "Method: POST\nHeaders: x-scheduler-token\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Job executed\" }"
+        },
+        "response": [
+            {
+                "name": "MF Daily",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Job executed\"\n}"
+            }
+        ]
+    },
+    {
+        "name": "MF : Nav history",
+        "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+                "raw": "{{base_url}}/jobs/mf-nav-history",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "jobs",
+                    "mf-nav-history"
+                ]
+            },
+            "description": "Method: POST\nParams: none\nBody: none\nResponse: { \"success\": true, \"message\": \"Job executed\" }"
+        },
+        "response": [
+            {
+                "name": "MF Nav History",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Job executed\"\n}"
+            }
+        ]
+    },
+    {
+        "name": "Mf : Single Nav History",
+        "request": {
+            "method": "POST",
+            "header": [
+                {
+                    "key": "x-scheduler-token",
+                    "value": "velvet_scheduler_secret_001",
+                    "type": "text"
+                }
+            ],
+            "url": {
+                "raw": "{{base_url}}/jobs/mf-single-nav/:scheme_code",
+                "host": [
+                    "{{base_url}}"
+                ],
+                "path": [
+                    "jobs",
+                    "mf-single-nav",
+                    ":scheme_code"
+                ],
+                "variable": [
+                    {
+                        "key": "scheme_code",
+                        "value": "125497"
+                }
+            ]
+            },
+            "description": "Method: POST\nHeaders: x-scheduler-token\nParams: scheme_code (path)\nBody: none\nResponse: { \"success\": true, \"message\": \"Job executed\" }"
+        },
+        "response": [
+            {
+                "name": "MF Single Nav",
+                "status": "OK",
+                "code": 200,
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": "{\n  \"success\": true,\n  \"message\": \"Job executed\"\n}"
+            }
+        ]
+    }
+]
+}
+],
+"auth": {
+    "type": "bearer",
+    "bearer": [
+        {
+            "key": "token",
+            "value": "{{auth_token}}",
             "type": "string"
         }
     ]
+},
+"variable": [
+    {
+        "key": "base_url",
+        "value": "http://localhost:8080/api/v1",
+        "type": "string"
+    }
+]
 }

@@ -1,15 +1,15 @@
 model MfProduct {
-    id                    String @id @default(uuid())
-    scheme_code           String @unique
+    id                    String  @id @default(uuid())
+    scheme_code           String  @unique
     scheme_name           String
     fund_house            String
     scheme_type           String
     scheme_category       String
-    isin_growth           String
-    isin_div_reinvestment String
+    isin_growth           String?
+    isin_div_reinvestment String?
 
     // Nested object flattened into two fields
-    latest_nav      Decimal  @db.Decimal(18, 4)
+    latest_nav      String?
     latest_nav_date DateTime
 
     // timestamp DateTime @default(now())
@@ -31,7 +31,7 @@ model MfNav {
     mf_product_id String
     scheme_code   String
     nav_date      DateTime
-    nav_value     Decimal  @db.Decimal(18, 4)
+    nav_value     String
 
     last_synced_at DateTime @default(now()) @updatedAt
     createdAt      DateTime @default(now())
