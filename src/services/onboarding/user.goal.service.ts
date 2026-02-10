@@ -1,12 +1,14 @@
 import axios from "axios";
 import { UserGoalInput } from "../../lib/zod-schemas/goal.schema.js";
 import { db } from "../../server.js";
+import { env } from "../../lib/config-env.js";
+import logger from "../../middleware/logger.js";
 
 class UserGoalServiceClass {
     finsys_api: string;
 
     constructor() {
-        this.finsys_api = `${process.env.FINSYS_BASE_API}/finnsys/app/master.service.asp`;
+        this.finsys_api = `${env.finsys_base_api}/finnsys/app/master.service.asp`;
     }
 
     private extract_params = (user: any, data: UserGoalInput) => {
@@ -45,9 +47,9 @@ class UserGoalServiceClass {
         return params;
     }
 
-    async createGoal(user: any, data: UserGoalInput) {
+    createGoal = async (user: any, data: UserGoalInput) => {
         // Store in Database
-        await db.userGoals.upsert({
+        const user_goal = await db.userGoals.upsert({
             where: {
                 user_goal_type_idx: {
                     user_id: user.id,
@@ -68,22 +70,23 @@ class UserGoalServiceClass {
 
         const res = await axios.get(this.finsys_api, { params });
 
-        if (res.data?.goal_id) {
+        logger.debug("Finsys goal res ==> ", res.data);
+
+        if (res.data.results[0]?.gid) {
             // Update goal_id in UserGoals table
-            await db.userGoals.updateMany({
+            await db.userGoals.update({
                 where: {
-                    user_id: user.id,
-                    goal_id: res.data.goal_id
+                    id: user_goal.id
                 },
                 data: {
-                    goal_id: res.data.goal_id
+                    goal_id: parseInt(res.data.results[0]?.gid)
                 }
             });
         }
         return res.data;
     }
 
-    async updateGoal(user: any, goal_id: number, data: UserGoalInput) {
+    updateGoal = async (user: any, goal_id: number, data: UserGoalInput) => {
         // 1. Update in Database
         await db.userGoals.updateMany({
             where: {

@@ -20,16 +20,36 @@ class MututalFundServiceClass {
 
         for (const mf of apiData) {
             if (!existingSet.has(mf.schemeCode)) {
+                // Manually parse DD-MM-YYYY to YYYY-MM-DD
+                let parsedDate: Date;
+                if (typeof mf.date === 'string' && mf.date.includes('-')) {
+                    const parts = mf.date.split('-');
+                    if (parts.length === 3 && parts[0].length === 2) {
+                        // Reorder from DD-MM-YYYY to YYYY-MM-DD
+                        parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    } else {
+                        parsedDate = new Date(mf.date);
+                    }
+                } else {
+                    parsedDate = new Date(mf.date);
+                }
+
+                // Skip if date is still invalid to avoid "Invalid time value" crash
+                if (isNaN(parsedDate.getTime())) {
+                    logger.error(`Skipping ${mf.schemeCode}: Invalid date format "${mf.date}"`);
+                    continue;
+                }
+
                 to_insert.push({
-                    scheme_code: mf.schemeCode,
+                    scheme_code: String(mf.schemeCode),
                     scheme_name: mf.schemeName,
                     fund_house: mf.fundHouse,
                     scheme_type: mf.schemeType,
                     scheme_category: mf.schemeCategory,
-                    latest_nav: mf.latestNav,
-                    isin_growth: mf.isinGrowth,
-                    isin_div_reinvestment: mf.isinDivReinvestment,
-                    latest_nav_date: new Date(mf.latestNavDate),
+                    latest_nav: mf.nav,
+                    isin_growth: mf.isinGrowth ?? undefined,
+                    isin_div_reinvestment: mf.isinDivReinvestment ?? undefined,
+                    latest_nav_date: parsedDate,
                 })
             }
         }
@@ -60,9 +80,11 @@ class MututalFundServiceClass {
 
         // endDate : YYYY-MM-DD format
         const endDate = (new Date()).toISOString().split('T')[0];
+        logger.debug(`NAV History Job: Starting with endDate = ${endDate}`);
 
         // startDate : YYYY-MM-DD format : Last five years
         const startDate = (new Date(new Date().setFullYear(new Date().getFullYear() - 5))).toISOString().split('T')[0];
+        logger.debug(`NAV History Job: Starting with startDate = ${startDate}`);
 
         const mf_products = await db.mfProduct.findMany({
             where: { last_synced_at: { lt: new Date(endDate) } },
@@ -81,6 +103,31 @@ class MututalFundServiceClass {
             )
         );
 
+    }
+
+    single_nav_history_job = async (scheme_code: string) => {
+        const endDate = (new Date()).toISOString().split('T')[0];
+        logger.debug(`NAV History Job: Starting with endDate = ${endDate}`);
+
+        // startDate : YYYY-MM-DD format : Last five years
+        const startDate = (new Date(new Date().setFullYear(new Date().getFullYear() - 5))).toISOString().split('T')[0];
+        logger.debug(`NAV History Job: Starting with startDate = ${startDate}`);
+
+
+        const mf_product = await db.mfProduct.findUnique({
+            where: { scheme_code },
+            select: {
+                id: true,
+                scheme_code: true
+            }
+        });
+
+        if (!mf_product) {
+            logger.warn(`Single NAV History Job: No product found for Scheme Code: ${scheme_code}`);
+            return;
+        }
+
+        await this.process_nav_history(mf_product, startDate, endDate);
     }
 
 
@@ -105,12 +152,34 @@ class MututalFundServiceClass {
 
             logger.debug(`Fetched NAV history for Scheme Code: ${product.scheme_code}, Records: ${nav_history_data.length}`);
 
-            const to_insert: MfNavCreateManyInput[] = nav_history_data.map((nav_record: any) => ({
-                mf_product_id: product.id,
-                scheme_code: product.scheme_code,
-                nav_date: new Date(nav_record.date),
-                nav_value: nav_record.nav,
-            }));
+            const to_insert: MfNavCreateManyInput[] = nav_history_data.map((nav_record: any) => {
+
+
+                let parsedDate: Date;
+                if (typeof nav_record.date === 'string' && nav_record.date.includes('-')) {
+                    const parts = nav_record.date.split('-');
+                    if (parts.length === 3 && parts[0].length === 2) {
+                        // Reorder from DD-MM-YYYY to YYYY-MM-DD
+                        parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    } else {
+                        parsedDate = new Date(nav_record.date);
+                    }
+                } else {
+                    parsedDate = new Date(nav_record.date);
+                }
+
+                // Skip if date is still invalid to avoid "Invalid time value" crash
+                if (isNaN(parsedDate.getTime())) {
+                    logger.error(`Skipping ${product.scheme_code}: Invalid date format "${nav_record.date}"`);
+                }
+
+                return {
+                    mf_product_id: product.id,
+                    scheme_code: product.scheme_code,
+                    nav_date: parsedDate,
+                    nav_value: nav_record.nav,
+                }
+            });
 
             // Bulk insert NAV history, ignoring duplicates
             if (to_insert.length > 0) {
