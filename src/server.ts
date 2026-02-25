@@ -16,6 +16,7 @@ import { user_insurance_router } from "./routes/user.insurance.router.js"
 import { user_goal_router } from "./routes/user.goal.router.js"
 import { auth_router } from "./routes/auth.router.js"
 import { job_router } from "./routes/job.router.js"
+import { kyc_router } from "./routes/kyc.router.js"
 
 
 //Configurations
@@ -51,6 +52,7 @@ app.use("/api/v1/user-loan", user_loan_router)
 app.use("/api/v1/user-insurance", user_insurance_router)
 app.use("/api/v1/user-goal", user_goal_router)
 
+app.use("/api/v1/mf-kyc", kyc_router)
 //Health check
 app.get("/ping", (_req, res) => {
     throw new AppError("Service is running...", 501, "SERVER_RUNNING")

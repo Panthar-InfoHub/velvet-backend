@@ -28,4 +28,8 @@ model User {
     user_insurance UserInsurance?
     user_loan      UserLoan[]
     user_goals     UserGoals[]
+
+    // Kyc Relations
+    kyc_types       KycType[]
+    mfKycIdentities MfKycIdentity?
 }

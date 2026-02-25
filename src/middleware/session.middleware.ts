@@ -10,6 +10,7 @@ interface resData {
     email?: string;
     log?: string;
     pwd?: string;
+    inv_id?: number;
 }
 
 declare global {
@@ -20,6 +21,7 @@ declare global {
                 email?: string;
                 log?: string;
                 pwd?: string;
+                inv_id?: number;
             };
         }
     }
@@ -40,7 +42,8 @@ export const login_require = async (req: Request, res: Response, next: NextFunct
             id: "",
             email: "",
             log: "",
-            pwd: ""
+            pwd: "",
+            inv_id: undefined
         }
 
         logger.debug("\n Decoded data ==> ", decoded)
@@ -55,14 +58,15 @@ export const login_require = async (req: Request, res: Response, next: NextFunct
         resData.email = user.email ?? undefined;
         resData.log = user.usr ?? undefined;
         resData.pwd = user.pwd ?? undefined;
-
+        resData.inv_id = user.inv_id ?? undefined;
         logger.debug("User data from token ==> ", resData)
 
         req.user = {
             id: resData.id,
             email: resData.email,
             log: resData.log,
-            pwd: resData.pwd
+            pwd: resData.pwd,
+            inv_id: resData.inv_id
         };
 
         next();

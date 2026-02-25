@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "MfNav" ALTER COLUMN "nav_value" SET DATA TYPE TEXT;
