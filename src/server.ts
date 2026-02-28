@@ -17,6 +17,8 @@ import { user_goal_router } from "./routes/user.goal.router.js"
 import { auth_router } from "./routes/auth.router.js"
 import { job_router } from "./routes/job.router.js"
 import { kyc_router } from "./routes/kyc.router.js"
+import { mututal_fund_router } from "./routes/mututal.fund.router.js"
+import { redis } from "./lib/redis.js"
 
 
 //Configurations
@@ -45,6 +47,7 @@ if (process.env.ENVIRONMENT === "dev") {
 app.use("/api/v1/auth", auth_router)
 app.use("/api/v1/user", user_router)
 app.use("/api/v1/jobs", job_router)
+app.use("/api/v1/mf", mututal_fund_router)
 app.use("/api/v1/onboarding", onboarding_router)
 app.use("/api/v1/user-assets", user_assets_router)
 app.use("/api/v1/user-finance", user_finance_router)

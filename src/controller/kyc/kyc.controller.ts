@@ -1,15 +1,13 @@
 import { NextFunction, Request, Response } from "express";
-import logger from "../../middleware/logger.js";
-import { user_service } from "../../services/user.service.js";
-import AppError from "../../middleware/error.middleware.js";
-import { kyc_finnsys_service } from "../../services/kyc/kyc.finnsys.service.js";
-import { kyc_type_service } from "../../services/kyc/kyc.type.service.js";
 import { env } from "../../lib/config-env.js";
-import { db } from "../../server.js";
-import { KycTypeValue } from "../../prisma/generated/prisma/enums.js";
+import { map_kyc_data_to_identity, update_kyc_data_schema } from "../../lib/zod-schemas/finnsys.schema.js";
+import AppError from "../../middleware/error.middleware.js";
+import logger from "../../middleware/logger.js";
+import { kyc_finnsys_service } from "../../services/kyc/kyc.finnsys.service.js";
 import { kyc_session_service } from "../../services/kyc/kyc.session.service.js";
+import { kyc_type_service } from "../../services/kyc/kyc.type.service.js";
 import { mfkyc_identity_service } from "../../services/kyc/mfkyc.identity.service.js";
-import { update_kyc_data_schema, map_kyc_data_to_identity } from "../../lib/zod-schemas/finnsys.schema.js";
+import { user_service } from "../../services/user.service.js";
 
 class KycControllerClass {
 
