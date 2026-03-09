@@ -39,6 +39,17 @@ class MFKycIdentityServiceClass {
         });
     }
 
+
+    get_verified_details = async (user_id: string, pan_no: string) => {
+        return await db.mfKycIdentity.findUnique({
+            where: {
+                user_id,
+                pan_no,
+                is_final_confirmed: true
+            }
+        });
+    }
+
     confirm_identity = async (user_id: string) => {
         return await this.update_identity(user_id, {
             is_final_confirmed: true,

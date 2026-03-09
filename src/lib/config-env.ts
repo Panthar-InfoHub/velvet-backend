@@ -12,6 +12,12 @@ export const env = {
     FINNSYS_USERNAME: process.env.FINNSYS_USERNAME!,
     FINNSYS_PASSWORD: process.env.FINNSYS_PASSWORD!,
 
+    // NSE Headers    
+    NSE_MEMBER_ID: process.env.NSE_MEMBER_ID!,
+    NSE_API_KEY: process.env.NSE_API_KEY!,
+    NSE_API_SECRET: process.env.NSE_API_SECRET!,
+    NSE_USERNAME: process.env.NSE_USERNAME!,
+
 
     // Redis Config
     REDIS_HOST: process.env.REDIS_HOST!,

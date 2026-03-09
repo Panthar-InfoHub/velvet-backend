@@ -55,3 +55,12 @@
       "nav": "180.54240"
     },
     {
+
+
+      Code,Income Range Description
+31,Below ₹1 Lakh
+32,₹1 Lakh – ₹5 Lakhs
+33,₹5 Lakhs – ₹10 Lakhs
+34,₹10 Lakhs – ₹25 Lakhs
+35,₹25 Lakhs – ₹1 Crore
+36,Above ₹1 Crore

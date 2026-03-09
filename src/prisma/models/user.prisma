@@ -19,6 +19,8 @@ model User {
     fcm_token String?   @db.Text
     meta_data Json?
 
+    nse_client_code String? @unique
+
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 

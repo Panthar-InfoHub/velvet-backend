@@ -1,5 +1,8 @@
-import { UserCreateInput } from "../prisma/generated/prisma/models.js";
+import { UserWithAllData } from "../lib/types.js";
+import { UserCreateInput, UserInclude } from "../prisma/generated/prisma/models.js";
 import { db } from "../server.js";
+
+
 
 class UserServiceClass {
     async create_user(data: UserCreateInput) {
@@ -66,6 +69,22 @@ class UserServiceClass {
         return await db.user.delete({
             where: {
                 id: user_id
+            }
+        });
+    }
+
+
+    async get_all_user_data(user_id: string, options?: Partial<Record<keyof UserInclude, boolean>>): Promise<UserWithAllData | null> {
+        return await db.user.findUnique({
+            where: {
+                id: user_id
+            },
+            include: {
+                user_finance: options?.user_finance ?? false,
+                user_assets: options?.user_assets ?? false,
+                user_insurance: options?.user_insurance ?? false,
+                user_loan: options?.user_loan ?? false,
+                user_goals: options?.user_goals ?? false,
             }
         });
     }
