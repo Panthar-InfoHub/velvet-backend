@@ -110,6 +110,10 @@ class AuthControllerClass {
                     user: {
                         user_id: updated_user.id,
                         phone_no: updated_user.phone_no,
+                        metadata: updated_user.meta_data ?? {
+                            onboarding_stage: 0,
+                            is_onboarding_complete: false,
+                        }
                     },
                     token: token,
                 }
