@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import logger from "../middleware/logger.js";
 import AppError from "../middleware/error.middleware.js";
 import { mututal_funds_service } from "../services/mutual-fund.service.js";
+import { job_service } from "../services/job.service.js";
 
 class JobControllerClass {
 
@@ -18,7 +19,7 @@ class JobControllerClass {
 
             logger.info("Running daily mutual fund job...");
 
-            await mututal_funds_service.daily_mf_product_job();
+            await job_service.daily_mf_product_job();
 
             res.status(200).json({
                 success: true,
@@ -58,7 +59,7 @@ class JobControllerClass {
 
         } catch (error: any) {
             console.error("Error while running mf nav history job ==> ", error.message);
-    // logger.error("Error while running mf nav history job ==> ", error.message);
+            // logger.error("Error while running mf nav history job ==> ", error.message);
             next(error);
             return;
         }
@@ -68,9 +69,9 @@ class JobControllerClass {
     mf_single_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
         try {
 
-            const scheme_code = req.params.scheme_code as string;
+            const scheme_id = req.params.id as string;
 
-            logger.info(`Running single nav history job for scheme code: ${scheme_code}...`);
+            logger.info(`Running single nav history job for scheme code: ${scheme_id}...`);
 
             const scheduler_token = req.headers["x-scheduler-token"];
             const secret = process.env.SCHEDULER_SECRET || "default_secret";
@@ -82,7 +83,7 @@ class JobControllerClass {
 
             logger.info("Running mf single nav history job...");
 
-            await mututal_funds_service.single_nav_history_job(scheme_code);
+            await mututal_funds_service.single_nav_history_job(scheme_id);
 
             res.status(200).json({
                 success: true,

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { user_insurance_controller } from "../controller/user.insurance.controller.js";
+import { user_insurance_controller } from "../../controller/user.insurance.controller.js";
 
 export const user_insurance_router = Router();
 

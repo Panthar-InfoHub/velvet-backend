@@ -29,7 +29,7 @@ class AuthControllerClass {
             const device_params = this.extract_device_params(req);
 
             // Optional Query Params
-            const mob = req.query.mob as string || "";
+            const mob = req.query.mob as string;
 
             if (!mob) {
                 logger.error("Mobile number is required for OTP request");
@@ -110,6 +110,10 @@ class AuthControllerClass {
                     user: {
                         user_id: updated_user.id,
                         phone_no: updated_user.phone_no,
+                        metadata: updated_user.meta_data ?? {
+                            onboarding_stage: 0,
+                            is_onboarding_complete: false,
+                        }
                     },
                     token: token,
                 }
@@ -128,7 +132,7 @@ class AuthControllerClass {
 
             const device_params = this.extract_device_params(req);
 
-            const inv_id = req.body.inv_id as number;
+            const inv_id = parseInt(req.body.inv_id as string);
 
             if (!inv_id) {
                 logger.error("Invoice ID is required for login");
@@ -142,11 +146,13 @@ class AuthControllerClass {
             }
 
             logger.info(`Login Attempt for User with InvId: ${inv_id}, Device: ${device_params.did}`);
-            const auth_res = await auth_service.login_invId(user.phone_no || "", "", inv_id, device_params);
+            const auth_res = await auth_service.login_invId(device_params, inv_id, user.phone_no ?? undefined, "");
+
+            logger.debug("Login response from auth service ==> ", auth_res);
 
 
             if (auth_res.code !== 1) {
-                throw new AppError("OTP validation failed", 401, "OTP_VALIDATION_FAILED");
+                throw new AppError("Login validation failed", 401, "LOGIN_VALIDATION_FAILED");
             }
 
             const updated_user = await user_service.update_user(user.id, {
@@ -198,7 +204,7 @@ class AuthControllerClass {
 
             const auth_res = await auth_service.login_creds(usr, pwd, device_params);
             if (auth_res.code !== 1) {
-                throw new AppError("OTP validation failed", 401, "OTP_VALIDATION_FAILED");
+                throw new AppError("Login validation failed", 401, "LOGIN_VALIDATION_FAILED");
             }
 
             const updated_user = await user_service.update_user(user.id, {

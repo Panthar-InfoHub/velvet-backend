@@ -1,4 +1,5 @@
 import { ErrorRequestHandler } from "express";
+import { Prisma } from "../prisma/generated/prisma/client.js";
 import logger from "./logger.js";
 
 
@@ -84,6 +85,75 @@ export const errorHandler: ErrorRequestHandler = (
                 "Your token has expired! Please log in again.",
                 401,
                 "TokenExpiredError"
+            );
+        }
+
+        // Prisma known request errors (P2xxx codes)
+        else if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            switch (error.code) {
+                case "P2002":
+                    error = new AppError(
+                        `Unique constraint violation on field: ${(error.meta?.target as string[])?.join(", ")}`,
+                        409,
+                        "PrismaUniqueConstraintError"
+                    );
+                    break;
+                case "P2003":
+                    error = new AppError(
+                        `Foreign key constraint failed on field: ${error.meta?.field_name}`,
+                        409,
+                        "PrismaForeignKeyError"
+                    );
+                    break;
+                case "P2025":
+                    error = new AppError(
+                        `Record not found: ${error.meta?.cause ?? "The requested resource does not exist"}`,
+                        404,
+                        "PrismaNotFoundError"
+                    );
+                    break;
+                case "P2034":
+                    error = new AppError(
+                        "Transaction conflict, please retry",
+                        409,
+                        "PrismaTransactionConflict"
+                    );
+                    break;
+                default:
+                    error = new AppError(
+                        `Database error (${error.code}): ${error.message}`,
+                        500,
+                        "PrismaKnownError"
+                    );
+            }
+        }
+
+        // Prisma raw query / unknown DB errors (e.g. PostgreSQL code 21000)
+        else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+            const rawCode = error.message.match(/Code: `(\w+)`/)?.[1];
+            error = new AppError(
+                `Raw query failed${rawCode ? ` (DB code: ${rawCode})` : ""}: ${error.message}`,
+                500,
+                "PrismaRawQueryError"
+            );
+        }
+
+        // Prisma validation error (wrong types / missing required fields passed to Prisma)
+        else if (error instanceof Prisma.PrismaClientValidationError) {
+            error = new AppError(
+                "Invalid data sent to database",
+                400,
+                "PrismaValidationError"
+            );
+        }
+
+        // Prisma connection / initialisation error
+        else if (error instanceof Prisma.PrismaClientInitializationError) {
+            error = new AppError(
+                "Database connection failed",
+                503,
+                "PrismaConnectionError",
+                false
             );
         }
 

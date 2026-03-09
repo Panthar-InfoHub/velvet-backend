@@ -1,6 +1,7 @@
 .env
 node_modules/
 dist/
+tests/
 /src/prisma/generated/
 
 # Editor / OS files
@@ -9,3 +10,4 @@ dist/
 .idea/
 
 TODO.md
+notes.js

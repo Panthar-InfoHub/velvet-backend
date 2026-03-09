@@ -15,14 +15,14 @@ model UserFinance {
 }
 
 model UserAssets {
-    id            String  @id @default(uuid())
-    user_id       String  @unique
-    mututal_funds Decimal @default(0.00) @db.Decimal(12, 2)
-    stocks        Decimal @default(0.00) @db.Decimal(12, 2)
-    fd            Decimal @default(0.00) @db.Decimal(12, 2)
-    real_estate   Decimal @default(0.00) @db.Decimal(12, 2)
-    gold          Decimal @default(0.00) @db.Decimal(12, 2)
-    cash_saving   Decimal @default(0.00) @db.Decimal(12, 2)
+    id           String  @id @default(uuid())
+    user_id      String  @unique
+    mutual_funds Decimal @default(0.00) @db.Decimal(12, 2)
+    stocks       Decimal @default(0.00) @db.Decimal(12, 2)
+    fd           Decimal @default(0.00) @db.Decimal(12, 2)
+    real_estate  Decimal @default(0.00) @db.Decimal(12, 2)
+    gold         Decimal @default(0.00) @db.Decimal(12, 2)
+    cash_saving  Decimal @default(0.00) @db.Decimal(12, 2)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
