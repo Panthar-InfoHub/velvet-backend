@@ -7,9 +7,13 @@ export const fire_report_controller = {
         try {
             const user_id: string = req.user!.id;
 
-            logger.info(`Generating FIRE report for user_id: ${user_id}`);
+            // projection_years: must be one of 5 | 10 | 20, defaults to 20
+            const raw_years = Number(req.query.projection_years);
+            const projection_years = [5, 10, 20].includes(raw_years) ? raw_years : 20;
 
-            const data = await fire_report_service.get_fire_report(user_id);
+            logger.info(`Generating FIRE report for user_id: ${user_id} (projection_years=${projection_years})`);
+
+            const data = await fire_report_service.get_fire_report(user_id, projection_years);
             res.status(200).json({
                 code: 200,
                 message: "FIRE report generated successfully",
