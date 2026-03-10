@@ -1,8 +1,8 @@
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { User } from "../prisma/generated/prisma/client.js";
 import { env } from "../lib/config-env.js";
 
-export const generate_JWT = (user: User): string => {
+export const generate_JWT = (user: User, period?: SignOptions["expiresIn"]): string => {
   const payload = {
     id: user.id,
     phone_no: user.phone_no,
@@ -12,7 +12,7 @@ export const generate_JWT = (user: User): string => {
   };
 
   const token = jwt.sign(payload, env.JWT_SECRET!, {
-    expiresIn: "7d",
+    expiresIn: period ?? "7d",
   });
 
   return token;

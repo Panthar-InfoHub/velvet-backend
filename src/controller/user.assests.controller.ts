@@ -6,7 +6,7 @@ import { user_assets_service } from "../services/onboarding/user.assets.service.
 
 // Zod Schema for User Assets
 const user_assets_zod_schema = z.object({
-    mututal_funds: z.number().min(0).default(0),
+    mutual_funds: z.number().min(0).default(0),
     stocks: z.number().min(0).default(0),
     fd: z.number().min(0).default(0),
     real_estate: z.number().min(0).default(0),
@@ -19,9 +19,9 @@ type UserAssetsInput = z.infer<typeof user_assets_zod_schema>;
 class UserAssetsControllerClass {
     async onboarding_create(req: Request) {
         const user = req.user!;
-        const data = req.body;
+        const { current_step, ...data }: any = req.body;
 
-        logger.debug(`Processing onboarding assets for User ID: ${user.id}`);
+        logger.debug(`Processing onboarding assets for User ID: ${user.id} with current step: ${current_step}`);
 
         const validated_data: UserAssetsInput = user_assets_zod_schema.parse(data);
         return await user_assets_service.create(user.id, validated_data);

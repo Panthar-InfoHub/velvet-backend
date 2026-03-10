@@ -18,9 +18,9 @@ type UserFinanceInput = z.infer<typeof user_finance_zod_schema>;
 class UserFinanceControllerClass {
     async onboarding_create(req: Request) {
         const user = req.user!;
-        const data = req.body;
+        const { current_step, ...data }: any = req.body;
 
-        logger.debug(`Processing onboarding finance for User ID: ${user.id}`);
+        logger.debug(`Processing onboarding finance for User ID: ${user.id} with current step: ${current_step}`);
 
         const validated_data: UserFinanceInput = user_finance_zod_schema.parse(data);
         return await user_finance_service.create(user.id, validated_data);

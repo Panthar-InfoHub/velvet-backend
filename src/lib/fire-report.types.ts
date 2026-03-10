@@ -1,5 +1,4 @@
-// ─── FIRE Constants ───────────────────────────────────────────────────────────
-
+// Constants for FIRE reports 
 export const FIRE_CONSTANTS = {
     income_growth: 0.08,             // 8% annual income growth
     expense_inflation: 0.06,         // 6% expense inflation
@@ -11,7 +10,7 @@ export const FIRE_CONSTANTS = {
     default_age: 30,                 // fallback when dob is null
 } as const;
 
-// ─── Engine 1 — Computed Metrics ─────────────────────────────────────────────
+//  Computed Metrics for FIRE report
 
 export interface ComputedMetrics {
     total_assets: number;
@@ -28,7 +27,7 @@ export interface ComputedMetrics {
     debt_to_income_ratio: number;
 }
 
-// ─── Engine 2 — FIRE Calculator ──────────────────────────────────────────────
+// FIRE Calculator 
 
 export interface FireCalculatorResult {
     current_age: number;
@@ -42,26 +41,31 @@ export interface FireCalculatorResult {
     monthly_investment_required: number;
 }
 
-// ─── Engine 3 — 30-Year Projection ───────────────────────────────────────────
+// 30-Year Projection
 
 export interface YearlyProjection {
     year: number;
     age: number;
-    capital: number;
-    annual_income: number;
-    annual_expenses: number;
+    income: number;
+    expenses: number;
+    emi_outflow: number;
+    goal_outflows: number;
     net_savings: number;
-    total_loan_emi: number;
-    goal_outflow: number;
+    beginning_capital: number;
+    investment_returns: number;
+    ending_capital: number;
+    fire_number: number;              // dynamic: expenses × 25 (grows with inflation each year)
+    fire_percentage: number;          // (ending_capital / fire_number) × 100
+    is_financially_independent: boolean;
     is_retired: boolean;
-    fire_progress: number;         // percentage: (capital / fireNumber) * 100
-    liquid_assets: number;
-    illiquid_assets: number;
-    emergency_fund_months: number; // liquid_assets / monthly_expenses
+    pension_income: number;           // income if retired, else 0
+    liquidity_ratio: number;          // initial_liquid_assets / monthly_expenses this year
+    debt_coverage_ratio: number;      // net_savings / max(emi, 1) if net_savings > 0, else 0
+    emergency_fund_months: number;    // cash_saving / monthly_expenses
     cumulative_goal_outflow: number;
 }
 
-// ─── Internal Pre-processing Types ───────────────────────────────────────────
+// Internal Pre-processing Types 
 
 export interface NormalizedGoal {
     name: string;
@@ -78,7 +82,7 @@ export interface TrackedLoan {
     annual_reduction: number;      // principal reduction factor per year
 }
 
-// ─── Combined Response ────────────────────────────────────────────────────────
+// Combined Response 
 
 export interface UserProfileSnapshot {
     name: string | null;

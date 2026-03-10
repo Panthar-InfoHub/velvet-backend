@@ -5,7 +5,7 @@ import logger from "../middleware/logger.js";
 export const fire_report_controller = {
     async get_fire_report(req: Request, res: Response, next: NextFunction) {
         try {
-            const user_id: string = req.body.user.id;
+            const user_id: string = req.user!.id;
 
             logger.info(`Generating FIRE report for user_id: ${user_id}`);
 

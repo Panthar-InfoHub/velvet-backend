@@ -50,6 +50,7 @@ class OnBoardingControllerClass {
             const current_step: number = data.current_step;
 
             if (!current_step) {
+                logger.error("current_step is required in request body");
                 throw new AppError("current_step is required", 400);
             }
 
