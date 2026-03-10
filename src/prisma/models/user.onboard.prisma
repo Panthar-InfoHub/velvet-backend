@@ -1,5 +1,5 @@
 model UserFinance {
-    id                     String  @id @default(uuid())
+    id                     String  @id @default(cuid())
     user_id                String  @unique
     annual_income          Decimal @default(0.00) @db.Decimal(12, 2)
     expense_house          Decimal @default(0.00) @db.Decimal(12, 2)
@@ -15,7 +15,7 @@ model UserFinance {
 }
 
 model UserAssets {
-    id           String  @id @default(uuid())
+    id           String  @id @default(cuid())
     user_id      String  @unique
     mutual_funds Decimal @default(0.00) @db.Decimal(12, 2)
     stocks       Decimal @default(0.00) @db.Decimal(12, 2)
@@ -32,7 +32,7 @@ model UserAssets {
 }
 
 model UserInsurance {
-    id               String  @id @default(uuid())
+    id               String  @id @default(cuid())
     user_id          String  @unique
     life_insurance   Decimal @default(0.00) @db.Decimal(12, 2)
     health_insurance Decimal @default(0.00) @db.Decimal(12, 2)
@@ -45,7 +45,7 @@ model UserInsurance {
 }
 
 model UserLoan {
-    id                 String  @id @default(uuid())
+    id                 String  @id @default(cuid())
     user_id            String
     loan_type          String
     loan_name          String?
@@ -63,7 +63,7 @@ model UserLoan {
 }
 
 model UserGoals {
-    id                   String  @id @default(uuid())
+    id                   String  @id @default(cuid())
     user_id              String
     goal_id              Int? // Finsys Goal ID
     goal_type_id         Int // 1 - child education, 2 - child marriage, 3 - retirement, 4 - buying a car, 5 - other

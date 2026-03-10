@@ -102,6 +102,7 @@ class AuthControllerClass {
             });
 
             const token = generate_JWT(updated_user);
+            const refresh_token = generate_JWT(updated_user, "30d");
 
             res.status(200).json({
                 success: true,
@@ -116,6 +117,7 @@ class AuthControllerClass {
                         }
                     },
                     token: token,
+                    refresh_token: refresh_token
                 }
             });
             return;
@@ -162,7 +164,7 @@ class AuthControllerClass {
             });
 
             const token = generate_JWT(updated_user);
-
+            const refresh_token = generate_JWT(updated_user, "30d");
             res.status(200).json({
                 success: true,
                 message: "Login successful",
@@ -172,6 +174,7 @@ class AuthControllerClass {
                         phone_no: updated_user.phone_no,
                     },
                     token: token,
+                    refresh_token: refresh_token
                 }
             });
             return;
@@ -214,6 +217,7 @@ class AuthControllerClass {
             });
 
             const token = generate_JWT(updated_user);
+            const refresh_token = generate_JWT(updated_user, "30d");
 
             res.status(200).json({
                 success: true,
@@ -222,8 +226,13 @@ class AuthControllerClass {
                     user: {
                         user_id: updated_user.id,
                         phone_no: updated_user.phone_no,
+                        metadata: updated_user.meta_data ?? {
+                            onboarding_stage: 0,
+                            is_onboarding_complete: false,
+                        }
                     },
                     token: token,
+                    refresh_token
                 }
             });
             return;

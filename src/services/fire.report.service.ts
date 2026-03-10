@@ -107,29 +107,25 @@ class FireReportServiceClass {
         let years_to_fire = 0;
         let monthly_investment_required = 0;
 
-        if (remaining <= 0) {
-            years_to_fire = 0;
-            monthly_investment_required = 0;
-        } else if (metrics.annual_savings <= 0) {
-            years_to_fire = 99;
-            monthly_investment_required = 0;
-        } else {
-            // Solve: FV = PV·(1+r)^n + PMT·[(1+r)^n - 1]/r  →  numerically via log
-            const r = real_return;
-            const pmt = metrics.annual_savings;
-            // Approximate n via natural log formula (continuous savings model)
-            years_to_fire = Math.log(1 + (remaining * r) / pmt) / Math.log(1 + r);
-            years_to_fire = Math.max(0, years_to_fire);
+        // Match old frontend exactly: single combined condition, work in monthly domain
+        if (remaining > 0 && metrics.annual_savings > 0) {
+            const monthly_savings = metrics.annual_savings / 12;
+            const monthly_rate = Math.pow(1 + real_return, 1 / 12) - 1; // effective monthly rate
 
-            // Monthly PMT formula: PMT = FV · (r/12) / [(1+r/12)^(n*12) - 1]
-            const r_monthly = real_return / 12;
-            const n_months = years_to_fire * 12;
-            const denom = Math.pow(1 + r_monthly, n_months) - 1;
-            monthly_investment_required = denom < 1e-9
-                ? remaining                          // lump sum fallback
-                : (remaining * r_monthly) / denom;
-            monthly_investment_required = Math.max(0, monthly_investment_required);
+            if (monthly_rate > 0) {
+                years_to_fire = Math.log(1 + (remaining * monthly_rate) / monthly_savings)
+                    / Math.log(1 + monthly_rate)
+                    / 12; // solve in months, convert to years
+            }
         }
+
+        years_to_fire = Math.max(0, years_to_fire);
+
+        // monthlyInvestmentRequired: only guard is remaining > 0 (matches old)
+        monthly_investment_required = remaining > 0
+            ? (remaining * (real_return / 12)) / (Math.pow(1 + real_return / 12, years_to_fire * 12) - 1)
+            : 0;
+        monthly_investment_required = Math.max(0, monthly_investment_required);
 
         return {
             current_age,
@@ -148,11 +144,14 @@ class FireReportServiceClass {
     private compute_projection(data: UserWithAllData, metrics: ComputedMetrics, calculator: FireCalculatorResult,): YearlyProjection[] {
         const current_year = new Date().getFullYear();
         const user_age = calculator.current_age;
-        const fire_number = calculator.fire_number;
 
         const goals = this.normalize_goals(data.user_goals ?? [], current_year);
         // deep-copy loans so tenure mutation doesn't affect the original array
         const loans = this.normalize_loans(data.user_loan ?? []).map(l => ({ ...l }));
+
+        // Snapshots used for auxiliary metrics (same as old frontend)
+        const initial_liquid_assets = metrics.liquid_assets;
+        const cash_saving = this.to_num(data.user_assets?.cash_saving);
 
         let capital = metrics.net_worth;
         let annual_income = this.to_num(data.user_finance?.annual_income);
@@ -166,62 +165,73 @@ class FireReportServiceClass {
             const age = user_age + i;
             const is_retired = age >= FIRE_CONSTANTS.retirement_age;
 
-            // Income 
-            if (is_retired) {
+            // Income projection (stops growing after retirement)
+            if (!is_retired) {
+                annual_income *= (1 + FIRE_CONSTANTS.income_growth);
+            } else {
                 annual_income = capital * FIRE_CONSTANTS.withdrawal_rate;
             }
+            annual_expenses *= (1 + FIRE_CONSTANTS.expense_inflation);
 
-            //  Loan EMIs 
-            const total_loan_emi = loans.reduce((sum, loan) => {
+            // Loan EMIs 
+            const emi_outflow = loans.reduce((sum, loan) => {
                 if (loan.remaining_months <= 0) return sum;
                 return sum + loan.monthly_emi * 12;
             }, 0);
 
-            //  Goal projections
-            let goal_outflow = 0;
+            // Goal outflows 
+            let goal_outflows = 0;
             for (const g of goals) {
                 if (g.target_year === year) {
-                    const future_value = g.current_cost * Math.pow(1 + g.inflation_rate, g.years_left);
-                    goal_outflow += future_value;
+                    const years_to_goal = year - current_year;
+                    const future_value = g.current_cost * Math.pow(1 + g.inflation_rate, years_to_goal);
+                    goal_outflows += future_value;
                 }
             }
-            cumulative_goal_outflow += goal_outflow;
+            cumulative_goal_outflow += goal_outflows;
 
-            //  Net savings + capital growth 
-            const net_savings = annual_income - annual_expenses - total_loan_emi - goal_outflow;
-            const growth_rate = is_retired
-                ? FIRE_CONSTANTS.post_retirement_return
-                : FIRE_CONSTANTS.expected_returns;
-            const ending_capital = Math.max(0, capital * (1 + growth_rate) + net_savings);
+            // Net savings (we includes goal outflows and EMIs as expenses)
+            const net_savings = annual_income - annual_expenses - emi_outflow - goal_outflows;
 
-            //  Auxiliary metrics (snapshot from initial; same as old frontend) 
-            const fire_progress = fire_number === 0 ? 0 : Math.min(100, (capital / fire_number) * 100);
+            // Portfolio growth as per previous version
+            const weighted_return = is_retired ? FIRE_CONSTANTS.post_retirement_return : FIRE_CONSTANTS.expected_returns;
+            const investment_returns = capital * weighted_return;
+            const ending_capital = Math.max(0, capital + net_savings + investment_returns);
+
+            // Dynamic FIRE number (recalculates every year as expenses grow)
+            const fire_number = annual_expenses * FIRE_CONSTANTS.fire_factor;
+            const fire_percentage = fire_number === 0 ? 0 : (ending_capital / fire_number) * 100;
+
+            // Emergency fund and liquidity metrics 
             const monthly_expenses = annual_expenses / 12;
-            const emergency_fund_months = monthly_expenses === 0
-                ? 0
-                : metrics.liquid_assets / monthly_expenses;
+            const pension_income = is_retired ? annual_income : 0;
+            const liquidity_ratio = monthly_expenses === 0 ? 0 : initial_liquid_assets / monthly_expenses;
+            const debt_coverage_ratio = net_savings > 0 ? net_savings / Math.max(emi_outflow, 1) : 0;
+            const emergency_fund_months = monthly_expenses === 0 ? 0 : cash_saving / monthly_expenses;
 
             projections.push({
                 year,
                 age,
-                capital: Math.round(capital),
-                annual_income: Math.round(annual_income),
-                annual_expenses: Math.round(annual_expenses),
+                income: Math.round(annual_income),
+                expenses: Math.round(annual_expenses),
+                emi_outflow: Math.round(emi_outflow),
+                goal_outflows: Math.round(goal_outflows),
                 net_savings: Math.round(net_savings),
-                total_loan_emi: Math.round(total_loan_emi),
-                goal_outflow: Math.round(goal_outflow),
+                beginning_capital: Math.round(capital),
+                investment_returns: Math.round(investment_returns),
+                ending_capital: Math.round(ending_capital),
+                fire_number: Math.round(fire_number),
+                fire_percentage: parseFloat(fire_percentage.toFixed(2)),
+                is_financially_independent: fire_percentage >= 100,
                 is_retired,
-                fire_progress: parseFloat(fire_progress.toFixed(2)),
-                liquid_assets: Math.round(metrics.liquid_assets),
-                illiquid_assets: Math.round(metrics.illiquid_assets),
+                pension_income: Math.round(pension_income),
+                liquidity_ratio: parseFloat(liquidity_ratio.toFixed(2)),
+                debt_coverage_ratio: parseFloat(debt_coverage_ratio.toFixed(2)),
                 emergency_fund_months: parseFloat(emergency_fund_months.toFixed(1)),
                 cumulative_goal_outflow: Math.round(cumulative_goal_outflow),
             });
 
-            // ── Advance state for next iteration ────────────────────────────
             capital = ending_capital;
-            if (!is_retired) annual_income *= (1 + FIRE_CONSTANTS.income_growth);
-            annual_expenses *= (1 + FIRE_CONSTANTS.expense_inflation);
 
             for (const loan of loans) {
                 loan.remaining_months = Math.max(0, loan.remaining_months - 12);
@@ -231,7 +241,7 @@ class FireReportServiceClass {
         return projections;
     }
 
-    // ─── Private Helpers ──────────────────────────────────────────────────────
+    //  Helpers Methods 
 
     private to_num(val: Prisma.Decimal | null | undefined): number {
         return val?.toNumber() ?? 0;
