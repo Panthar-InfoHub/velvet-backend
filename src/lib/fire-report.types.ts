@@ -90,6 +90,7 @@ export interface NormalizedGoalWithSIP {
     life_expectancy: number | null; // retirement only
     current_monthly_exp: number | null; // retirement only — used for corpus PV
     required_monthly_sip: number;   // pre-computed; deducted annually until target_year
+    future_value: number;           // inflation-adjusted corpus at target_year
     goal_type_id: number;
 }
 
@@ -99,6 +100,59 @@ export interface TrackedLoan {
     loan_type: string;
     monthly_emi: number;
     tenure_months: number;          // original tenure — never mutated; used for partial-year calc
+}
+
+// ─── Enriched breakdown interfaces ───────────────────────────────────────────
+
+export interface AssetsBreakdown {
+    mutual_funds: number;
+    stocks: number;
+    fd: number;
+    real_estate: number;
+    gold: number;
+    cash_saving: number;
+    total_liquid: number;
+    total_illiquid: number;
+    total: number;
+}
+
+export interface LiabilityItem {
+    loan_type: string;
+    outstanding: number;
+    monthly_emi: number;
+    tenure_months: number;
+}
+
+export interface ExpenseBreakdown {
+    house: number;
+    food: number;
+    transportation: number;
+    others: number;
+    total_monthly: number;
+    total_annual: number;
+}
+
+export interface InsuranceSummary {
+    term_life_have: number;
+    term_life_recommended: number;
+    term_life_gap: number;
+    health_have: number;
+    health_recommended: number;
+    health_gap: number;
+}
+
+/** One backward-simulated quarterly data point for trend charts */
+export interface QuarterlyPoint {
+    quarter: string;
+    net_worth: number;       // in Lakhs
+    fire_number: number;     // in Lakhs
+    fire_percentage: number; // %
+}
+
+export interface YearlyGoalRequirement {
+    year: number;
+    monthly_required: number;
+    yearly_required: number;
 }
 
 // ─── User profile snapshot ───────────────────────────────────────────────────
@@ -116,4 +170,11 @@ export interface FireReportCoreResponse {
     computed_metrics: ComputedMetrics;
     goals: NormalizedGoalWithSIP[];
     projection: ProjectionRow[];
+    // ── Enriched breakdown fields ──
+    assets_breakdown: AssetsBreakdown;
+    liabilities: LiabilityItem[];
+    expense_breakdown: ExpenseBreakdown;
+    insurance_summary: InsuranceSummary;
+    quarterly_simulation: QuarterlyPoint[];
+    yearly_goal_requirements: YearlyGoalRequirement[];
 }

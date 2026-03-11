@@ -7,6 +7,12 @@ import {
     NormalizedGoalWithSIP,
     TrackedLoan,
     FireReportCoreResponse,
+    AssetsBreakdown,
+    LiabilityItem,
+    ExpenseBreakdown,
+    InsuranceSummary,
+    QuarterlyPoint,
+    YearlyGoalRequirement,
 } from "../lib/fire-report.types.js";
 import { UserWithAllData } from "../lib/types.js";
 import { user_service } from "./user.service.js";
@@ -50,6 +56,12 @@ class FireReportServiceClass {
             computed_metrics,
             goals,
             projection,
+            assets_breakdown: this.extract_assets_breakdown(data),
+            liabilities: this.extract_liabilities(data),
+            expense_breakdown: this.extract_expense_breakdown(data),
+            insurance_summary: this.compute_insurance_summary(data, computed_metrics),
+            quarterly_simulation: this.generate_quarterly_simulation(computed_metrics, projection),
+            yearly_goal_requirements: this.generate_yearly_goal_table(projection),
         };
     }
 
@@ -236,26 +248,26 @@ class FireReportServiceClass {
         goal: NormalizedGoalWithSIP,
         dob: Date | null,
         monthly_expenses_total: number,
-    ): number {
+    ): { sip: number; corpus: number } {
         const current_year = new Date().getFullYear();
 
         // ── Retirement (goal_type_id === 3) ──────────────────────────────────
         if (goal.goal_type_id === 3) {
-            if (!dob) return 0;
+            if (!dob) return { sip: 0, corpus: 0 };
 
             const birth_year = new Date(dob).getFullYear();
             const present_age = current_year - birth_year;
             // target_year is already birth_year + retirement_age (set in normalize)
             const retirement_age = goal.target_year - birth_year;
             const years_to_retirement = retirement_age - present_age;
-            if (years_to_retirement <= 0) return 0;
+            if (years_to_retirement <= 0) return { sip: 0, corpus: 0 };
 
             const life_expectancy = goal.life_expectancy ?? 80;
             const years_post_retirement = life_expectancy - retirement_age;
-            if (years_post_retirement <= 0) return 0;
+            if (years_post_retirement <= 0) return { sip: 0, corpus: 0 };
 
             const monthly_exp = goal.current_monthly_exp ?? monthly_expenses_total;
-            if (monthly_exp <= 0) return 0;
+            if (monthly_exp <= 0) return { sip: 0, corpus: 0 };
 
             const r = FIRE_CONSTANTS.retirement_return;    // 0.10
             const inflation = FIRE_CONSTANTS.retirement_inflation; // 0.06
@@ -279,26 +291,27 @@ class FireReportServiceClass {
             }
 
             const months_to_retirement = years_to_retirement * 12;
-            if (months_to_retirement <= 0) return 0;
+            if (months_to_retirement <= 0) return { sip: 0, corpus: 0 };
 
             // Monthly SIP PMT (annuity-due) to accumulate retirement_corpus
             const rm = Math.pow(1 + r, 1 / 12) - 1;
             const fv_factor = Math.pow(1 + rm, months_to_retirement) - 1;
-            if (fv_factor <= 0 || rm <= 0) return 0;
+            if (fv_factor <= 0 || rm <= 0) return { sip: 0, corpus: 0 };
 
             const monthly_sip = (retirement_corpus * rm) / (fv_factor * (1 + rm));
-            const value = Math.round(monthly_sip);
-            return isFinite(value) ? value : 0;
+            const sip = Math.round(monthly_sip);
+            return { sip: isFinite(sip) ? sip : 0, corpus: Math.round(retirement_corpus) };
         }
 
         // ── Non-retirement (types 1, 2, 4) ───────────────────────────────────
         // Formula: numerator / (11 × 12 × denominator) from FireReport.tsx
         const years_to_goal = goal.target_year - current_year;
         const denominator = Math.pow(1 + FIRE_CONSTANTS.goal_sip_return, years_to_goal) - 1; // (1.1^n - 1)
-        if (denominator === 0) return 0;
+        if (denominator === 0) return { sip: 0, corpus: 0 };
         const numerator = goal.target_amount * Math.pow(1 + FIRE_CONSTANTS.goal_fv_growth, years_to_goal); // target × 1.08^n
         const value = numerator / (11 * 12 * denominator);
-        return isFinite(value) ? Math.round(value) : 0;
+        const sip = isFinite(value) ? Math.round(value) : 0;
+        return { sip, corpus: Math.round(numerator) };
     }
 
     //  Goal Future Value 
@@ -335,6 +348,97 @@ class FireReportServiceClass {
             loan_type: l.loan_type,
             monthly_emi: this.to_num(l.monthly_emi),
             tenure_months: l.tenure_months ?? 0,
+        }));
+    }
+
+    // ── 6 Enrichment helpers ──────────────────────────────────────────────────
+
+    private extract_assets_breakdown(data: UserWithAllData): AssetsBreakdown {
+        const mf = this.to_num(data.user_assets?.mutual_funds);
+        const stocks = this.to_num(data.user_assets?.stocks);
+        const fd = this.to_num(data.user_assets?.fd);
+        const real_estate = this.to_num(data.user_assets?.real_estate);
+        const gold = this.to_num(data.user_assets?.gold);
+        const cash_saving = this.to_num(data.user_assets?.cash_saving);
+        const total_liquid = mf + stocks + fd + cash_saving;
+        const total_illiquid = real_estate + gold;
+        return { mutual_funds: mf, stocks, fd, real_estate, gold, cash_saving, total_liquid, total_illiquid, total: total_liquid + total_illiquid };
+    }
+
+    private extract_liabilities(data: UserWithAllData): LiabilityItem[] {
+        return (data.user_loan ?? []).map(l => ({
+            loan_type: l.loan_type,
+            outstanding: this.to_num(l.outstanding_amount),
+            monthly_emi: this.to_num(l.monthly_emi),
+            tenure_months: l.tenure_months ?? 0,
+        }));
+    }
+
+    private extract_expense_breakdown(data: UserWithAllData): ExpenseBreakdown {
+        const house = this.to_num(data.user_finance?.expense_house);
+        const food = this.to_num(data.user_finance?.expense_food);
+        const transportation = this.to_num(data.user_finance?.expense_transportation);
+        const others = this.to_num(data.user_finance?.expense_others);
+        const total_annual = house + food + transportation + others;
+        return { house, food, transportation, others, total_monthly: Math.round(total_annual / 12), total_annual };
+    }
+
+    private compute_insurance_summary(data: UserWithAllData, metrics: ComputedMetrics): InsuranceSummary {
+        const annual_income = metrics.monthly_income * 12;
+        const term_life_recommended = Math.max(
+            15 * annual_income,
+            metrics.total_liabilities + 10 * metrics.total_annual_expenses,
+        );
+        const health_recommended = Math.max(4 * metrics.monthly_income, 2_000_000);
+        const term_life_have = this.to_num(data.user_insurance?.life_insurance);
+        const health_have = this.to_num(data.user_insurance?.health_insurance);
+        return {
+            term_life_have,
+            term_life_recommended: Math.round(term_life_recommended),
+            term_life_gap: Math.max(0, Math.round(term_life_recommended - term_life_have)),
+            health_have,
+            health_recommended: Math.round(health_recommended),
+            health_gap: Math.max(0, Math.round(health_recommended - health_have)),
+        };
+    }
+
+    /** Deterministic backward simulation of 6 quarterly data points for trend charts.
+     *  Uses: nw(i) = net_worth × 0.98^i   fire_number(i) = fn_now × 0.985^i
+     *  where i=5 is 5 quarters ago and i=0 is the current quarter. */
+    private generate_quarterly_simulation(metrics: ComputedMetrics, projection: ProjectionRow[]): QuarterlyPoint[] {
+        const net_worth = metrics.net_worth;
+        const fire_number_now = projection[0]?.fire_number.emi_include ?? 0;
+        const now = new Date();
+        const current_q = Math.floor(now.getMonth() / 3); // 0-3
+        const current_year = now.getFullYear();
+
+        const quarter_label = (q_offset: number): string => {
+            let q = current_q - q_offset;
+            let y = current_year;
+            while (q < 0) { q += 4; y--; }
+            return `Q${q + 1} ${y}`;
+        };
+
+        const points: QuarterlyPoint[] = [];
+        for (let i = 5; i >= 0; i--) {
+            const nw = net_worth * Math.pow(0.98, i);
+            const fn = fire_number_now * Math.pow(0.985, i);
+            const fp = fn > 0 ? (nw / fn) * 100 : 0;
+            points.push({
+                quarter: quarter_label(i),
+                net_worth: parseFloat((nw / 100_000).toFixed(2)),
+                fire_number: parseFloat((fn / 100_000).toFixed(2)),
+                fire_percentage: parseFloat(fp.toFixed(2)),
+            });
+        }
+        return points;
+    }
+
+    private generate_yearly_goal_table(projection: ProjectionRow[]): YearlyGoalRequirement[] {
+        return projection.map(row => ({
+            year: row.year,
+            monthly_required: Math.round(row.goal_commitment_annual / 12),
+            yearly_required: row.goal_commitment_annual,
         }));
     }
 
@@ -375,9 +479,12 @@ class FireReportServiceClass {
                         ? this.to_num(g.current_monthly_expense)
                         : null,
                     required_monthly_sip: 0,
+                    future_value: 0,
                     goal_type_id: 3,
                 };
-                entry.required_monthly_sip = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
+                const { sip: ret_sip, corpus: ret_corpus } = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
+                entry.required_monthly_sip = ret_sip;
+                entry.future_value = ret_corpus;
                 normalized.push(entry);
                 continue;
             }
@@ -401,9 +508,12 @@ class FireReportServiceClass {
                 life_expectancy: null,
                 current_monthly_exp: null,
                 required_monthly_sip: 0,
+                future_value: 0,
                 goal_type_id: g.goal_type_id,
             };
-            entry.required_monthly_sip = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
+            const { sip, corpus } = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
+            entry.required_monthly_sip = sip;
+            entry.future_value = corpus;
             normalized.push(entry);
         }
 

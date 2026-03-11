@@ -4,7 +4,7 @@
   "main": "dist/server.js ",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/lib/fonts dist/lib/",
     "dev": "nodemon --watch src --ext ts --exec \"npm run build && node ./dist/server.js\"",
     "gcp-build": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build",
     "start": "npx prisma migrate deploy && node dist/server.js"
@@ -20,6 +20,7 @@
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.0.9",
     "@types/pg": "^8.16.0",
+    "@types/react": "^19.2.14",
     "nodemon": "^3.1.11",
     "prisma": "^7.2.0",
     "ts-node": "^10.9.2",
@@ -36,6 +37,8 @@
     "morgan": "^1.10.1",
     "p-limit": "^7.3.0",
     "pg": "^8.17.1",
+    "puppeteer": "^24.39.0",
+    "react": "^19.2.4",
     "redis": "^5.11.0",
     "uuid": "^13.0.0",
     "winston": "^3.19.0",
