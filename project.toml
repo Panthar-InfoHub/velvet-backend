@@ -1,9 +1,0 @@
-[[build.buildpacks]]
-  # This is the direct internal GCR path for the Apt utility
-  uri = "gcr.io/google-22/utils/apt"
-
-[[build.buildpacks]]
-  uri = "google.nodejs.runtime"
-
-[[build.buildpacks]]
-  uri = "google.nodejs.npm"
