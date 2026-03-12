@@ -5,6 +5,12 @@ import { generateFireReportHTML } from "../lib/fire-report.template.js";
 import { renderPDF } from "../lib/fire-report.renderer.js";
 import logger from "../middleware/logger.js";
 
+import { exec } from "child_process";
+import { promisify } from "util";
+import path from "path";
+
+const execPromise = promisify(exec);
+
 export const fire_report_controller = {
     async get_fire_report(req: Request, res: Response, next: NextFunction) {
         try {
@@ -32,6 +38,7 @@ export const fire_report_controller = {
     async get_fire_report_pdf(req: Request, res: Response, next: NextFunction) {
         try {
             const user_id: string = req.user!.id;
+            await checkChromeDependencies();
 
             logger.info(`Generating FIRE PDF report for user_id: ${user_id}`);
 
@@ -52,4 +59,34 @@ export const fire_report_controller = {
             return;
         }
     },
+
 };
+
+
+async function checkChromeDependencies() {
+    // Path to the bundled chrome binary in your .cache folder
+    // Note: The version number might change if puppeteer updates, 
+    // so we use a wildcard or the specific one from your logs.
+    const chromePath = "/workspace/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome"
+
+    try {
+        logger.info("Starting dependency check for Chrome...");
+        // ldd lists all shared library dependencies and their status
+        const { stdout, stderr } = await execPromise(`ldd ${chromePath}`);
+
+        if (stderr) logger.warn(`ldd stderr: ${stderr}`);
+
+        const missing = stdout
+            .split("\n")
+            .filter(line => line.includes("not found"))
+            .map(line => line.trim());
+
+        if (missing.length > 0) {
+            logger.error(`🚨 MISSING LIBRARIES DETECTED: \n${missing.join("\n")}`);
+        } else {
+            logger.info("✅ All Chrome shared libraries are present.");
+        }
+    } catch (error) {
+        logger.error(`Could not run dependency check: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}

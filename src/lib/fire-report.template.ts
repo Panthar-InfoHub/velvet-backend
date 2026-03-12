@@ -152,6 +152,7 @@ function barChart(have: number, recommended: number, haveColor: string, recColor
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 function getCSS(regularB64: string, boldB64: string): string {
   return `
+    /* 1. FONT DEFINITIONS: Use unique family for bold to guarantee results */
     @font-face {
         font-family: 'NotoSans';
         src: url('data:font/truetype;base64,${regularB64}') format('truetype'); 
@@ -161,130 +162,129 @@ function getCSS(regularB64: string, boldB64: string): string {
     @font-face { 
         font-family: 'NotoSansBold'; 
         src: url('data:font/truetype;base64,${boldB64}') format('truetype'); 
-        font-weight: 400; /* Use 400 here so the engine doesn't try to 'double bold' it */
+        font-weight: 400; /* File is already bold; 400 avoids 'double bolding' */
         font-style: normal; 
     }
 
+    /* 2. BASE RESET & PRINT SETTINGS */
     @page { size: A4; margin: 0; }
-    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; }
+    * { 
+        box-sizing: border-box; 
+        margin: 0; 
+        padding: 0; 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+    }
     
     body { 
         font-family: 'NotoSans', sans-serif; 
         font-size: 9px; 
-        color: #1F2937; 
+        color: #111827; /* Darker black for high contrast */
         background: white; 
+        -webkit-font-smoothing: antialiased;
     }
 
-    /* CRITICAL FIX: Direct override for all bold elements */
+    /* 3. CRITICAL BOLDNESS OVERRIDES */
     b, strong, .bold, th { 
         font-family: 'NotoSansBold' !important; 
-        font-weight: normal !important; /* The font file is ALREADY bold */
+        font-weight: normal !important; 
+        color: inherit;
     }
 
-    /* Fix for your specific classes */
-    .brand-name, .logo, .page-title, .section-title, .card-value, .tile-value, .summary-title, .val {
+    /* Force specific high-impact elements to use the Bold family */
+    .brand-name, .logo, .page-title, .section-title, .card-value, .tile-value, .summary-title, .val, .kpi-value, .metric-value {
         font-family: 'NotoSansBold' !important;
+        font-weight: normal !important;
     }
 
-    /* Catch-all for inline styles you might have */
+    /* Catch-all for any inline styles or legacy weight tags */
     [style*="font-weight:bold"], [style*="font-weight: bold"], [style*="font-weight:700"] {
         font-family: 'NotoSansBold' !important;
+        font-weight: normal !important;
     }
 
-    /* Each page is exactly A4, uses flex column so body fills all space */
+    /* 4. LAYOUT & STRUCTURE */
     .page {
-      width:210mm; height:297mm;
-      padding:14mm 14mm 28mm 14mm;
-      position:relative; overflow:hidden;
-      page-break-after:always;
-      display:flex; flex-direction:column;
+      width: 210mm; height: 297mm;
+      padding: 14mm 14mm 28mm 14mm;
+      position: relative; overflow: hidden;
+      page-break-after: always;
+      display: flex; flex-direction: column;
     }
-    .page:last-child { page-break-after:avoid; }
+    .page:last-child { page-break-after: avoid; }
 
-    /* This div grows to consume all available vertical space between header and footnotes */
-    .page-body { flex:1; display:flex; flex-direction:column; min-height:0; }
+    .page-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-    /* A row2 that lets children grow vertically to fill space */
-    .row2-fill { display:flex; gap:10px; flex:1; min-height:0; margin-bottom:10px; }
-    .row2-fill > * { flex:1; min-width:0; display:flex; flex-direction:column; }
-    .row2-fill .card { flex:1; }
+    .row2-fill { display: flex; gap: 10px; flex: 1; min-height: 0; margin-bottom: 10px; }
+    .row2-fill > * { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .row2-fill .card { flex: 1; }
 
-    .page-header { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${GOLD}; padding-bottom:8px; margin-bottom:12px; flex-shrink:0; }
-    .header-left { display:flex; align-items:center; gap:10px; }
-    .logo { width:32px; height:32px; background:${NAVY}; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white; font-size:13px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .brand-name { font-size:12px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .brand-sub { font-size:8px; color:${GRAY}; }
-    .header-right { text-align:right; }
-    .client-name { font-size:10px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .client-sub { font-size:8px; color:${GRAY}; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${GOLD}; padding-bottom: 8px; margin-bottom: 12px; flex-shrink: 0; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo { width: 34px; height: 34px; background: ${NAVY}; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; }
+    .brand-name { font-size: 12px; color: ${NAVY}; }
+    .brand-sub { font-size: 8px; color: ${GRAY}; }
+    .header-right { text-align: right; }
+    .client-name { font-size: 10px; color: ${NAVY}; }
+    .client-sub { font-size: 8px; color: ${GRAY}; }
 
-    .page-footer { position:absolute; bottom:10mm; left:14mm; right:14mm; display:flex; justify-content:space-between; border-top:1px solid #E5E7EB; padding-top:4px; font-size:8px; color:${GRAY}; }
+    .page-footer { position: absolute; bottom: 10mm; left: 14mm; right: 14mm; display: flex; justify-content: space-between; border-top: 1px solid #E5E7EB; padding-top: 4px; font-size: 8px; color: ${GRAY}; }
 
-    .footnotes-block { position:absolute; bottom:18mm; left:14mm; right:14mm; border-top:0.5px solid #E5E7EB; padding-top:4px; }
-    .fn { font-size:7px; color:#4B5563; margin-top:2px; line-height:1.4; padding-left:12px; text-indent:-12px; }
-    .fn_1 { font-size:10px; color:#4B5563; margin-top:2px; line-height:1.4; padding-left:12px; text-indent:-12px; }
-    .fn b { font-family:'NotoSansBold','NotoSans',sans-serif; font-weight:700; color:#111827; }
+    .footnotes-block { position: absolute; bottom: 18mm; left: 14mm; right: 14mm; border-top: 0.5px solid #E5E7EB; padding-top: 4px; }
+    .fn { font-size: 7px; color: #4B5563; margin-top: 2px; line-height: 1.4; padding-left: 12px; text-indent: -12px; }
+    .fn_1 { font-size: 10px; color: #4B5563; margin-top: 2px; line-height: 1.4; padding-left: 12px; text-indent: -12px; }
 
-    .page-title { font-size:16px; font-weight:bold; color:${NAVY}; margin-bottom:6px; flex-shrink:0; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .insight { font-size:9px; color:#374151; margin-bottom:10px; flex-shrink:0; line-height:1.5; background:#F9FAFB; border-left:3px solid ${GOLD}; padding:8px 10px; border-radius:0 4px 4px 0; }
-    .section-title { font-size:11px; font-weight:bold; color:${NAVY}; margin:8px 0 5px; flex-shrink:0; font-family:'NotoSansBold','NotoSans',sans-serif; }
+    .page-title { font-size: 18px; color: ${NAVY}; margin-bottom: 6px; flex-shrink: 0; }
+    .insight { font-size: 9px; color: #374151; margin-bottom: 10px; flex-shrink: 0; line-height: 1.5; background: #F9FAFB; border-left: 3px solid ${GOLD}; padding: 8px 10px; border-radius: 0 4px 4px 0; }
+    .section-title { font-size: 12px; color: ${NAVY}; margin: 8px 0 5px; flex-shrink: 0; }
 
-    .row2 { display:flex; gap:10px; margin-bottom:10px; flex-shrink:0; }
-    .row2 > * { flex:1; min-width:0; }
+    .row2 { display: flex; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
+    .row2 > * { flex: 1; min-width: 0; }
 
-    .card { background:white; border:1px solid #E5E7EB; border-radius:6px; padding:10px; }
-    .card-label { font-size:8px; color:${GRAY}; margin-bottom:4px; }
-    .card-value { font-size:22px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .card-sub { font-size:8px; color:${GRAY}; margin-top:4px; }
+    .card { background: white; border: 1px solid #E5E7EB; border-radius: 6px; padding: 10px; }
+    .card-label { font-size: 8px; color: ${GRAY}; margin-bottom: 4px; }
+    .card-value { font-size: 24px; color: ${NAVY}; }
+    .card-sub { font-size: 8px; color: ${GRAY}; margin-top: 4px; }
 
-    .badge-pos { display:inline-block; background:#DCFCE7; color:#15803D; font-size:8px; padding:2px 6px; border-radius:10px; }
-    .badge-neg { display:inline-block; background:#FEE2E2; color:#B91C1C; font-size:8px; padding:2px 6px; border-radius:10px; }
+    .badge-pos { display: inline-block; background: #DCFCE7; color: #15803D; font-size: 8px; padding: 2px 6px; border-radius: 10px; }
+    .badge-neg { display: inline-block; background: #FEE2E2; color: #B91C1C; font-size: 8px; padding: 2px 6px; border-radius: 10px; }
 
-    .tiles { display:flex; gap:8px; margin-bottom:6px; }
-    .tile { flex:1; text-align:center; padding:8px; background:white; border:1px solid #E5E7EB; border-radius:6px; }
-    .tile-label { font-size:8px; color:${GRAY}; margin-bottom:2px; }
-    .tile-value { font-size:16px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
+    .tiles { display: flex; gap: 8px; margin-bottom: 6px; }
+    .tile { flex: 1; text-align: center; padding: 8px; background: white; border: 1px solid #E5E7EB; border-radius: 6px; }
+    .tile-label { font-size: 8px; color: ${GRAY}; margin-bottom: 2px; }
+    .tile-value { font-size: 16px; }
 
-    .progress-bg { height:12px; background:#E5E7EB; border-radius:6px; width:100%; margin:6px 0; }
-    .progress-fill { height:12px; border-radius:6px; background:${NAVY}; }
+    .progress-bg { height: 12px; background: #E5E7EB; border-radius: 6px; width: 100%; margin: 6px 0; }
+    .progress-fill { height: 12px; border-radius: 6px; background: ${NAVY}; }
 
-    .tbl { width:100%; border-collapse:collapse; flex-shrink:0; }
-    .tbl thead tr { background:#F3F4F6; border-bottom:1.5px solid #D1D5DB; }
-    .tbl th { font-size:8px; font-weight:bold; padding:5px 4px; color:#374151; text-align:left; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .tbl td { font-size:8px; padding:4px 4px; color:#374151; border-bottom:0.5px solid #E5E7EB; }
-    .tbl tr:nth-child(even) td { background:#FAFAFA; }
-    .tbl .text-right { text-align:right; }
-    .tbl .bold { font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .tbl .green { color:${GREEN}; }
+    .tbl { width: 100%; border-collapse: collapse; flex-shrink: 0; }
+    .tbl thead tr { background: #F9FAFB; border-bottom: 2px solid #D1D5DB; }
+    .tbl th { font-size: 8px; padding: 6px 4px; color: #111827; text-align: left; }
+    .tbl td { font-size: 8px; padding: 5px 4px; color: #374151; border-bottom: 0.5px solid #E5E7EB; }
+    .tbl tr:nth-child(even) td { background: #FAFAFA; }
+    .tbl .text-right { text-align: right; }
+    .tbl .green { color: ${GREEN}; font-weight: bold; }
 
-    .metric-row { display:flex; justify-content:space-between; padding:2px 0; }
-    .metric-label { font-size:8px; color:${GRAY}; }
-    .metric-value { font-size:8px; font-weight:bold; color:#1F2937; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .divider { border-bottom:0.5px solid #E5E7EB; margin:6px 0; }
+    .metric-row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .metric-label { font-size: 8px; color: ${GRAY}; }
+    .metric-value { font-size: 8px; color: #1F2937; }
+    .divider { border-bottom: 0.5px solid #E5E7EB; margin: 6px 0; }
 
-    .ins-box { flex:1; border-radius:6px; padding:8px; }
-    .summary-box { background:${NAVY}; border-radius:6px; padding:14px; color:white; flex-shrink:0; }
-    .summary-title { font-size:10px; font-weight:bold; margin-bottom:10px; font-family:'NotoSansBold','NotoSans',sans-serif; }
-    .summary-grid { display:flex; justify-content:space-between; }
-    .summary-item .sub { font-size:8px; opacity:0.8; }
-    .summary-item .val { font-size:14px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
+    .ins-box { flex: 1; border-radius: 6px; padding: 8px; }
+    .summary-box { background: ${NAVY}; border-radius: 6px; padding: 14px; color: white; flex-shrink: 0; }
+    .summary-title { font-size: 10px; margin-bottom: 10px; }
+    .summary-grid { display: flex; justify-content: space-between; }
+    .summary-item .sub { font-size: 8px; opacity: 0.8; }
+    .summary-item .val { font-size: 14px; }
 
-    /* KPI strip for filling space */
-    .kpi-strip { display:flex; gap:8px; flex-shrink:0; }
-    .kpi-strip > div { flex:1; background:#F3F4F6; border-radius:6px; padding:10px; text-align:center; }
-    .kpi-label { font-size:8px; color:${GRAY}; margin-bottom:3px; }
-    .kpi-value { font-size:13px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
+    .kpi-strip { display: flex; gap: 8px; flex-shrink: 0; }
+    .kpi-strip > div { flex: 1; background: #F3F4F6; border-radius: 6px; padding: 10px; text-align: center; }
+    .kpi-label { font-size: 8px; color: ${GRAY}; margin-bottom: 3px; }
+    .kpi-value { font-size: 13px; }
 
-    /* spacer that absorbs leftover vertical space */
-    .spacer { flex:1; }
+    .spacer { flex: 1; }
 
-    /* ── catch-all: enforce NotoSansBold on every inline font-weight:bold/700 element ── */
-    [style*="font-weight:bold"],
-    [style*="font-weight: bold"],
-    [style*="font-weight:700"],
-    [style*="font-weight: 700"] { font-family:'NotoSansBold','NotoSans',sans-serif !important; }
-
-    @media print { .page { page-break-after:always; } .page:last-child { page-break-after:avoid; } }
+    @media print { .page { page-break-after: always; } .page:last-child { page-break-after: avoid; } }
     `;
 }
 
