@@ -152,12 +152,44 @@ function barChart(have: number, recommended: number, haveColor: string, recColor
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 function getCSS(regularB64: string, boldB64: string): string {
   return `
-    @font-face { font-family:'NotoSans'; src:url('data:font/truetype;base64,${regularB64}') format('truetype'); font-weight:400; font-style:normal; font-display:block; }
-    @font-face { font-family:'NotoSans'; src:url('data:font/truetype;base64,${boldB64}') format('truetype'); font-weight:700; font-style:normal; font-display:block; }
-    @page { size:A4; margin:0; }
-    * { box-sizing:border-box; margin:0; padding:0; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-    body { font-family:'NotoSans',sans-serif; font-size:9px; color:#1F2937; background:white; -webkit-font-smoothing:antialiased; }
-    b, strong { font-family:'NotoSans',sans-serif; font-weight:700; font-size:inherit; color:inherit; }
+    @font-face {
+        font-family: 'NotoSans';
+        src: url('data:font/truetype;base64,${regularB64}') format('truetype'); 
+        font-weight: 400; 
+        font-style: normal; 
+    }
+    @font-face { 
+        font-family: 'NotoSansBold'; 
+        src: url('data:font/truetype;base64,${boldB64}') format('truetype'); 
+        font-weight: 400; /* Use 400 here so the engine doesn't try to 'double bold' it */
+        font-style: normal; 
+    }
+
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; }
+    
+    body { 
+        font-family: 'NotoSans', sans-serif; 
+        font-size: 9px; 
+        color: #1F2937; 
+        background: white; 
+    }
+
+    /* CRITICAL FIX: Direct override for all bold elements */
+    b, strong, .bold, th { 
+        font-family: 'NotoSansBold' !important; 
+        font-weight: normal !important; /* The font file is ALREADY bold */
+    }
+
+    /* Fix for your specific classes */
+    .brand-name, .logo, .page-title, .section-title, .card-value, .tile-value, .summary-title, .val {
+        font-family: 'NotoSansBold' !important;
+    }
+
+    /* Catch-all for inline styles you might have */
+    [style*="font-weight:bold"], [style*="font-weight: bold"], [style*="font-weight:700"] {
+        font-family: 'NotoSansBold' !important;
+    }
 
     /* Each page is exactly A4, uses flex column so body fills all space */
     .page {
@@ -179,11 +211,11 @@ function getCSS(regularB64: string, boldB64: string): string {
 
     .page-header { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid ${GOLD}; padding-bottom:8px; margin-bottom:12px; flex-shrink:0; }
     .header-left { display:flex; align-items:center; gap:10px; }
-    .logo { width:32px; height:32px; background:${NAVY}; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white; font-size:13px; font-weight:bold; }
-    .brand-name { font-size:12px; font-weight:bold; color:${NAVY}; }
+    .logo { width:32px; height:32px; background:${NAVY}; border-radius:4px; display:flex; align-items:center; justify-content:center; color:white; font-size:13px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
+    .brand-name { font-size:12px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .brand-sub { font-size:8px; color:${GRAY}; }
     .header-right { text-align:right; }
-    .client-name { font-size:10px; font-weight:bold; color:${NAVY}; }
+    .client-name { font-size:10px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .client-sub { font-size:8px; color:${GRAY}; }
 
     .page-footer { position:absolute; bottom:10mm; left:14mm; right:14mm; display:flex; justify-content:space-between; border-top:1px solid #E5E7EB; padding-top:4px; font-size:8px; color:${GRAY}; }
@@ -191,18 +223,18 @@ function getCSS(regularB64: string, boldB64: string): string {
     .footnotes-block { position:absolute; bottom:18mm; left:14mm; right:14mm; border-top:0.5px solid #E5E7EB; padding-top:4px; }
     .fn { font-size:7px; color:#4B5563; margin-top:2px; line-height:1.4; padding-left:12px; text-indent:-12px; }
     .fn_1 { font-size:10px; color:#4B5563; margin-top:2px; line-height:1.4; padding-left:12px; text-indent:-12px; }
-    .fn b { font-weight:700; color:#111827; }
+    .fn b { font-family:'NotoSansBold','NotoSans',sans-serif; font-weight:700; color:#111827; }
 
-    .page-title { font-size:16px; font-weight:bold; color:${NAVY}; margin-bottom:6px; flex-shrink:0; }
+    .page-title { font-size:16px; font-weight:bold; color:${NAVY}; margin-bottom:6px; flex-shrink:0; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .insight { font-size:9px; color:#374151; margin-bottom:10px; flex-shrink:0; line-height:1.5; background:#F9FAFB; border-left:3px solid ${GOLD}; padding:8px 10px; border-radius:0 4px 4px 0; }
-    .section-title { font-size:11px; font-weight:bold; color:${NAVY}; margin:8px 0 5px; flex-shrink:0; }
+    .section-title { font-size:11px; font-weight:bold; color:${NAVY}; margin:8px 0 5px; flex-shrink:0; font-family:'NotoSansBold','NotoSans',sans-serif; }
 
     .row2 { display:flex; gap:10px; margin-bottom:10px; flex-shrink:0; }
     .row2 > * { flex:1; min-width:0; }
 
     .card { background:white; border:1px solid #E5E7EB; border-radius:6px; padding:10px; }
     .card-label { font-size:8px; color:${GRAY}; margin-bottom:4px; }
-    .card-value { font-size:22px; font-weight:bold; color:${NAVY}; }
+    .card-value { font-size:22px; font-weight:bold; color:${NAVY}; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .card-sub { font-size:8px; color:${GRAY}; margin-top:4px; }
 
     .badge-pos { display:inline-block; background:#DCFCE7; color:#15803D; font-size:8px; padding:2px 6px; border-radius:10px; }
@@ -211,40 +243,46 @@ function getCSS(regularB64: string, boldB64: string): string {
     .tiles { display:flex; gap:8px; margin-bottom:6px; }
     .tile { flex:1; text-align:center; padding:8px; background:white; border:1px solid #E5E7EB; border-radius:6px; }
     .tile-label { font-size:8px; color:${GRAY}; margin-bottom:2px; }
-    .tile-value { font-size:16px; font-weight:bold; }
+    .tile-value { font-size:16px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
 
     .progress-bg { height:12px; background:#E5E7EB; border-radius:6px; width:100%; margin:6px 0; }
     .progress-fill { height:12px; border-radius:6px; background:${NAVY}; }
 
     .tbl { width:100%; border-collapse:collapse; flex-shrink:0; }
     .tbl thead tr { background:#F3F4F6; border-bottom:1.5px solid #D1D5DB; }
-    .tbl th { font-size:8px; font-weight:bold; padding:5px 4px; color:#374151; text-align:left; }
+    .tbl th { font-size:8px; font-weight:bold; padding:5px 4px; color:#374151; text-align:left; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .tbl td { font-size:8px; padding:4px 4px; color:#374151; border-bottom:0.5px solid #E5E7EB; }
     .tbl tr:nth-child(even) td { background:#FAFAFA; }
     .tbl .text-right { text-align:right; }
-    .tbl .bold { font-weight:bold; }
+    .tbl .bold { font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .tbl .green { color:${GREEN}; }
 
     .metric-row { display:flex; justify-content:space-between; padding:2px 0; }
     .metric-label { font-size:8px; color:${GRAY}; }
-    .metric-value { font-size:8px; font-weight:bold; color:#1F2937; }
+    .metric-value { font-size:8px; font-weight:bold; color:#1F2937; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .divider { border-bottom:0.5px solid #E5E7EB; margin:6px 0; }
 
     .ins-box { flex:1; border-radius:6px; padding:8px; }
     .summary-box { background:${NAVY}; border-radius:6px; padding:14px; color:white; flex-shrink:0; }
-    .summary-title { font-size:10px; font-weight:bold; margin-bottom:10px; }
+    .summary-title { font-size:10px; font-weight:bold; margin-bottom:10px; font-family:'NotoSansBold','NotoSans',sans-serif; }
     .summary-grid { display:flex; justify-content:space-between; }
     .summary-item .sub { font-size:8px; opacity:0.8; }
-    .summary-item .val { font-size:14px; font-weight:bold; }
+    .summary-item .val { font-size:14px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
 
     /* KPI strip for filling space */
     .kpi-strip { display:flex; gap:8px; flex-shrink:0; }
     .kpi-strip > div { flex:1; background:#F3F4F6; border-radius:6px; padding:10px; text-align:center; }
     .kpi-label { font-size:8px; color:${GRAY}; margin-bottom:3px; }
-    .kpi-value { font-size:13px; font-weight:bold; }
+    .kpi-value { font-size:13px; font-weight:bold; font-family:'NotoSansBold','NotoSans',sans-serif; }
 
     /* spacer that absorbs leftover vertical space */
     .spacer { flex:1; }
+
+    /* ── catch-all: enforce NotoSansBold on every inline font-weight:bold/700 element ── */
+    [style*="font-weight:bold"],
+    [style*="font-weight: bold"],
+    [style*="font-weight:700"],
+    [style*="font-weight: 700"] { font-family:'NotoSansBold','NotoSans',sans-serif !important; }
 
     @media print { .page { page-break-after:always; } .page:last-child { page-break-after:avoid; } }
     `;
@@ -274,7 +312,7 @@ function page1(data: VelvetReportViewData): string {
       <div style="display:flex;gap:10px;flex:1;min-height:0">
         <div class="card" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px">
           <div class="card-label" style="font-size:9px">Current Net Worth</div>
-          <div style="font-size:46px;font-weight:700;color:${NAVY};margin:10px 0 6px;line-height:1">${rs(fmt_cr(snapshot.netWorth), NAVY, "40px")}</div>
+          <div style="font-size:46px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin:10px 0 6px;line-height:1">${rs(fmt_cr(snapshot.netWorth), NAVY, "40px")}</div>
           <span class="${nwPos ? "badge-pos" : "badge-neg"}" style="font-size:9px;padding:3px 8px">${nwPos ? "↑" : "↓"} ${Math.abs(parseFloat(qoqChanges.netWorth)).toFixed(1)}%</span>
           <div style="font-size:8.5px;color:${GRAY};margin-top:10px">Previous Quarter: ${rs(fmt_cr(snapshot.netWorthPrevQ), GRAY, "8px")}</div>
           <div style="font-size:8px;color:${GRAY};margin-top:2px">Absolute Increase: ${rs(fmt_cr(snapshot.netWorth - snapshot.netWorthPrevQ), GRAY, "7.5px")}</div>
@@ -284,15 +322,15 @@ function page1(data: VelvetReportViewData): string {
           <div style="display:flex;gap:12px;margin-bottom:10px;">
             <div style="flex:1">
               <div style="font-size:8px;color:${GRAY}">FIRE Number<sup>2</sup></div>
-              <div style="font-size:17px;font-weight:700;color:${NAVY};margin-top:2px">${rs(fmt_cr(snapshot.fireNumber), NAVY, "15px")}</div>
+              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-top:2px">${rs(fmt_cr(snapshot.fireNumber), NAVY, "15px")}</div>
             </div>
             <div style="flex:1">
               <div style="font-size:8px;color:${GRAY}">FIRE %<sup>3</sup></div>
-              <div style="font-size:17px;font-weight:700;color:${GOLD};margin-top:2px">${pct(snapshot.firePercentage)}</div>
+              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD};margin-top:2px">${pct(snapshot.firePercentage)}</div>
             </div>
             <div style="flex:1">
               <div style="font-size:8px;color:${GRAY}">Gap<sup>4</sup></div>
-              <div style="font-size:17px;font-weight:700;color:${RED};margin-top:2px">${rs(fmt_cr(snapshot.fireGap), RED, "15px")}</div>
+              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED};margin-top:2px">${rs(fmt_cr(snapshot.fireGap), RED, "15px")}</div>
             </div>
           </div>
           <div class="progress-bg"><div class="progress-fill" style="width:${fireBarW}%"></div></div>
@@ -305,7 +343,7 @@ function page1(data: VelvetReportViewData): string {
       <div style="display:flex;gap:10px;flex:1;min-height:0">
         <div class="card" style="flex:1;display:flex;flex-direction:column;padding:10px">
           <div class="card-label">QoQ Net Worth Change<sup>5</sup></div>
-          <div style="font-size:24px;font-weight:700;color:${nwPos ? GREEN : RED};margin:2px 0">${nwPos ? "+" : ""}${qoqChanges.netWorth}%</div>
+          <div style="font-size:24px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${nwPos ? GREEN : RED};margin:2px 0">${nwPos ? "+" : ""}${qoqChanges.netWorth}%</div>
           <div style="font-size:8px;color:${GRAY}">Quarter over Quarter</div>
           <div style="flex:1;min-height:0;display:flex;align-items:center">
             ${sparkline(nwHistory, GREEN, 430, 130)}
@@ -314,7 +352,7 @@ function page1(data: VelvetReportViewData): string {
         </div>
         <div class="card" style="flex:1;display:flex;flex-direction:column;padding:10px">
           <div class="card-label">QoQ FIRE Score Change<sup>6</sup></div>
-          <div style="font-size:24px;font-weight:700;color:${firePos ? GOLD : RED};margin:2px 0">${firePos ? "+" : ""}${qoqChanges.firePercent}%</div>
+          <div style="font-size:24px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${firePos ? GOLD : RED};margin:2px 0">${firePos ? "+" : ""}${qoqChanges.firePercent}%</div>
           <div style="font-size:8px;color:${GRAY}">FIRE % Improvement</div>
           <div style="flex:1;min-height:0;display:flex;align-items:center">
             ${sparkline(fireHistory, GOLD, 430, 130)}
@@ -366,15 +404,15 @@ function page2(data: VelvetReportViewData): string {
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;align-items:flex-end">
           <div>
             <div class="metric-label">Current Portfolio</div>
-            <div style="font-size:16px;font-weight:bold;color:${NAVY}">${rs(fmt_cr(snapshot.fireCurrentCorpus), NAVY, "13px")}</div>
+            <div style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(snapshot.fireCurrentCorpus), NAVY, "13px")}</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:28px;font-weight:bold;color:${GOLD}">${pct(snapshot.firePercentage)}</div>
+            <div style="font-size:28px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD}">${pct(snapshot.firePercentage)}</div>
             <div class="metric-label">FIRE Progress</div>
           </div>
           <div style="text-align:right">
             <div class="metric-label">FIRE Target</div>
-            <div style="font-size:16px;font-weight:bold;color:${RED}">${rs(fmt_cr(snapshot.fireNumber), RED, "13px")}</div>
+            <div style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED}">${rs(fmt_cr(snapshot.fireNumber), RED, "13px")}</div>
           </div>
         </div>
         <div class="progress-bg"><div class="progress-fill" style="width:${fireBarW}%;background:linear-gradient(to right,#3B82F6,${GREEN})"></div></div>
@@ -384,7 +422,7 @@ function page2(data: VelvetReportViewData): string {
         </div>
       </div>
 
-      ${snapshot.fiYear ? `<div style="font-size:9px;font-weight:bold;color:${NAVY};margin-bottom:6px;flex-shrink:0">Projected FI in Year ${snapshot.fiYear} at FIRE % &ge; 100% (Age ${snapshot.fiAge})</div>` : ""}
+      ${snapshot.fiYear ? `<div style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-bottom:6px;flex-shrink:0">Projected FI in Year ${snapshot.fiYear} at FIRE % &ge; 100% (Age ${snapshot.fiAge})</div>` : ""}
 
       <table class="tbl">
         <thead>
@@ -446,27 +484,27 @@ function page3(data: VelvetReportViewData): string {
       <div class="row2">
         <div class="ins-box" style="background:#F0FDF4;border:1.5px solid ${GREEN}">
           <div class="card-label">Income&sup1;&sup3;</div>
-          <div style="font-size:32px;font-weight:bold;color:${GREEN}">${rs(fmt_in(monthlyIncome), GREEN, "28px")}</div>
+          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${rs(fmt_in(monthlyIncome), GREEN, "28px")}</div>
           <div class="divider"></div>
           <div class="metric-row"><span class="metric-label">Monthly Income</span><span class="metric-value">${rs(fmt_in(monthlyIncome), "#1F2937", "8px")}</span></div>
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold"><span style="font-size:8px">Total Income</span><span style="font-size:8px">${rs(fmt_in(monthlyIncome), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Income</span><span style="font-size:8px">${rs(fmt_in(monthlyIncome), "#1F2937", "8px")}</span></div>
         </div>
         <div class="ins-box" style="background:#FEF2F2;border:1.5px solid ${RED}">
           <div class="card-label">Expenses&sup1;&sup4;</div>
-          <div style="font-size:32px;font-weight:bold;color:${RED}">${rs(fmt_in(monthlyExpense), RED, "28px")}</div>
+          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED}">${rs(fmt_in(monthlyExpense), RED, "28px")}</div>
           <div class="divider"></div>
           ${expenseRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold"><span style="font-size:8px">Total Expenses</span><span style="font-size:8px">${rs(fmt_in(monthlyExpense), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Expenses</span><span style="font-size:8px">${rs(fmt_in(monthlyExpense), "#1F2937", "8px")}</span></div>
         </div>
       </div>
 
       <div style="padding:0 40px;margin-bottom:10px;flex-shrink:0">
         <div class="card" style="display:flex;justify-content:space-around;border:2px solid ${GREEN}">
-          <div style="text-align:center"><div class="metric-label">Surplus&sup1;&sup5;</div><div style="font-size:32px;font-weight:bold;color:${GREEN}">${rs(fmt_in(monthlySurplus), GREEN, "28px")}</div></div>
-          <div style="text-align:center"><div class="metric-label">Savings Rate&sup1;&sup6;</div><div style="font-size:32px;font-weight:bold;color:${GREEN}">${pct(savingsRate)}</div></div>
-          <div style="text-align:center"><div class="metric-label">Annual Surplus</div><div style="font-size:20px;font-weight:bold;color:#1F2937">${rs(fmt_cr(incomeExpense.annualSurplus), "#1F2937", "16px")}</div></div>
+          <div style="text-align:center"><div class="metric-label">Surplus&sup1;&sup5;</div><div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${rs(fmt_in(monthlySurplus), GREEN, "28px")}</div></div>
+          <div style="text-align:center"><div class="metric-label">Savings Rate&sup1;&sup6;</div><div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${pct(savingsRate)}</div></div>
+          <div style="text-align:center"><div class="metric-label">Annual Surplus</div><div style="font-size:20px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:#1F2937">${rs(fmt_cr(incomeExpense.annualSurplus), "#1F2937", "16px")}</div></div>
         </div>
       </div>
 
@@ -474,27 +512,27 @@ function page3(data: VelvetReportViewData): string {
       <div class="row2">
         <div class="ins-box" style="background:#EFF6FF;border:1.5px solid ${NAVY}">
           <div class="card-label">Assets&sup1;&sup7;</div>
-          <div style="font-size:32px;font-weight:bold;color:${NAVY}">${rs(fmt_cr(balanceSheet.totalAssets), NAVY, "28px")}</div>
+          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(balanceSheet.totalAssets), NAVY, "28px")}</div>
           <div class="divider"></div>
           ${assetRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold"><span style="font-size:8px">Total Assets</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalAssets), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Assets</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalAssets), "#1F2937", "8px")}</span></div>
         </div>
         <div class="ins-box" style="background:#FFF7ED;border:1.5px solid #F97316">
           <div class="card-label">Liabilities&sup1;&sup8;</div>
-          <div style="font-size:32px;font-weight:bold;color:#F97316">${rs(fmt_cr(balanceSheet.totalLiabilities), "#F97316", "28px")}</div>
+          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:#F97316">${rs(fmt_cr(balanceSheet.totalLiabilities), "#F97316", "28px")}</div>
           <div class="divider"></div>
           ${liabRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold"><span style="font-size:8px">Total Liabilities</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalLiabilities), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Liabilities</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalLiabilities), "#1F2937", "8px")}</span></div>
         </div>
       </div>
 
       <div style="padding:0 40px;flex-shrink:0">
         <div class="card" style="display:flex;justify-content:space-around;border:2px solid ${GOLD}">
-          <div style="text-align:center"><div class="metric-label">Net Worth&sup1;&sup9;</div><div style="font-size:32px;font-weight:bold;color:${GOLD}">${rs(fmt_cr(balanceSheet.netWorth), GOLD, "28px")}</div></div>
-          <div style="text-align:center"><div class="metric-label">QoQ Change</div><div style="font-size:28px;font-weight:bold;color:${nwPos ? GREEN : RED}">${nwPos ? "+" : ""}${balanceSheet.qoqNwPct}%</div></div>
-          <div style="text-align:center"><div class="metric-label">Previous Quarter</div><div style="font-size:20px;font-weight:bold;color:#1F2937">${rs(fmt_cr(balanceSheet.netWorthPrevQ), "#1F2937", "16px")}</div></div>
+          <div style="text-align:center"><div class="metric-label">Net Worth&sup1;&sup9;</div><div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD}">${rs(fmt_cr(balanceSheet.netWorth), GOLD, "28px")}</div></div>
+          <div style="text-align:center"><div class="metric-label">QoQ Change</div><div style="font-size:28px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${nwPos ? GREEN : RED}">${nwPos ? "+" : ""}${balanceSheet.qoqNwPct}%</div></div>
+          <div style="text-align:center"><div class="metric-label">Previous Quarter</div><div style="font-size:20px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:#1F2937">${rs(fmt_cr(balanceSheet.netWorthPrevQ), "#1F2937", "16px")}</div></div>
         </div>
       </div>
     </div>
@@ -538,7 +576,7 @@ function page4(data: VelvetReportViewData): string {
     return `
         <div class="card" style="margin-bottom:8px;flex-shrink:0">
           <div style="display:flex;justify-content:space-between">
-            <span style="font-size:9px;font-weight:bold;color:${NAVY}">${cat.label}</span>
+            <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${cat.label}</span>
             <span style="font-size:9px;color:${parseFloat(q.pct) >= 0 ? GREEN : RED}">${parseFloat(q.pct) >= 0 ? "+" : ""}${q.pct}% QoQ</span>
           </div>
           ${sparkline(td, cat.color, 870, 80, true)}
@@ -556,7 +594,7 @@ function page4(data: VelvetReportViewData): string {
       <div class="row2">
         <div class="card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:190px;gap:8px">
           <div class="card-label">Current Net Worth&sup2;&sup0;</div>
-          <div style="font-size:40px;font-weight:bold;color:${NAVY}">${rs(fmt_cr(balanceSheet.netWorth), NAVY, "34px")}</div>
+          <div style="font-size:40px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(balanceSheet.netWorth), NAVY, "34px")}</div>
           <span class="${nwPos ? "badge-pos" : "badge-neg"}">${nwPos ? "+" : ""}${Math.abs(parseFloat(String(balanceSheet.qoqNwPct)))}%</span>
           <div class="card-sub">vs ${data.previousQuarter}</div>
           <div class="card-sub">Previous Quarter: ${rs(fmt_cr(balanceSheet.netWorthPrevQ), GRAY, "8px")}</div>
@@ -676,16 +714,16 @@ function page6(data: VelvetReportViewData): string {
           <div style="flex:1;display:flex;justify-content:center">${barChart(insurance.termLife.have, insurance.termLife.recommended, GOLD, NAVY, "Cr")}</div>
           <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
             <div class="ins-box" style="background:#FFFBEB;border:1px solid ${GOLD};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">Current Coverage</span>
-              <span style="font-size:16px;font-weight:bold;color:${GOLD}">${rs(fmt_cr(insurance.termLife.have), GOLD, "14px")}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">Current Coverage</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD}">${rs(fmt_cr(insurance.termLife.have), GOLD, "14px")}</span>
             </div>
             <div class="ins-box" style="background:rgba(30,58,95,0.05);border:1px solid ${NAVY};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">Recommended</span>
-              <span style="font-size:16px;font-weight:bold;color:${NAVY}">${rs(fmt_cr(insurance.termLife.recommended), NAVY, "14px")}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">Recommended</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(insurance.termLife.recommended), NAVY, "14px")}</span>
             </div>
             <div class="ins-box" style="background:${termGap ? "#FEF2F2" : "#F0FDF4"};border:1px solid ${termGap ? RED : GREEN};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">${termGap ? "Shortfall" : "Status"}</span>
-              <span style="font-size:16px;font-weight:bold;color:${termGap ? RED : GREEN}">${termGap ? rs(fmt_cr(insurance.termLife.gap), RED, "14px") : "&#10003; Adequate"}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">${termGap ? "Shortfall" : "Status"}</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${termGap ? RED : GREEN}">${termGap ? rs(fmt_cr(insurance.termLife.gap), RED, "14px") : "&#10003; Adequate"}</span>
             </div>
           </div>
         </div>
@@ -697,16 +735,16 @@ function page6(data: VelvetReportViewData): string {
           <div style="flex:1;display:flex;justify-content:center">${barChart(insurance.health.have, insurance.health.recommended, GREEN, NAVY, "L")}</div>
           <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
             <div class="ins-box" style="background:#F0FDF4;border:1px solid ${GREEN};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">Current Coverage</span>
-              <span style="font-size:16px;font-weight:bold;color:${GREEN}">${rs(fmt_cr(insurance.health.have), GREEN, "14px")}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">Current Coverage</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${rs(fmt_cr(insurance.health.have), GREEN, "14px")}</span>
             </div>
             <div class="ins-box" style="background:rgba(30,58,95,0.05);border:1px solid ${NAVY};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">Recommended</span>
-              <span style="font-size:16px;font-weight:bold;color:${NAVY}">${rs(fmt_cr(insurance.health.recommended), NAVY, "14px")}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">Recommended</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(insurance.health.recommended), NAVY, "14px")}</span>
             </div>
             <div class="ins-box" style="background:${healthGap ? "#FEF2F2" : "rgba(34,197,94,0.15)"};border:1px solid ${healthGap ? RED : GREEN};display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:9px;font-weight:bold">${healthGap ? "Shortfall" : "Status"}</span>
-              <span style="font-size:16px;font-weight:bold;color:${healthGap ? RED : GREEN}">${healthGap ? rs(fmt_cr(insurance.health.gap), RED, "14px") : "&#10003; Adequate"}</span>
+              <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">${healthGap ? "Shortfall" : "Status"}</span>
+              <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${healthGap ? RED : GREEN}">${healthGap ? rs(fmt_cr(insurance.health.gap), RED, "14px") : "&#10003; Adequate"}</span>
             </div>
           </div>
         </div>
@@ -725,7 +763,7 @@ function page6(data: VelvetReportViewData): string {
               <div style="display:flex;align-items:flex-start;gap:5px">
                 <span style="color:${GOLD};font-size:10px;line-height:1.2">&#9679;</span>
                 <div>
-                  <div style="font-size:8px;font-weight:bold;color:${NAVY}">${r.title}</div>
+                  <div style="font-size:8px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${r.title}</div>
                   <div style="font-size:7.5px;color:${GRAY}">${r.desc}</div>
                 </div>
               </div>
@@ -768,20 +806,23 @@ export function generateFireReportHTML(data: VelvetReportViewData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Velvet Wealth Health Report</title>
   <style>${css}</style>
-  <script>
-    // Explicitly load both font weights before signalling the renderer to print.
-    // document.fonts.ready alone is unreliable when warming elements use opacity:0,
-    // because Chromium may skip loading fonts for invisible nodes.
-    Promise.all([
-      document.fonts.load('400 1em NotoSans'),
-      document.fonts.load('700 1em NotoSans')
-    ]).then(function() { window.__fontsReady = true; });
-  </script>
+ <script>
+        // Check for the fonts specifically
+        Promise.all([
+            document.fonts.load('1em NotoSans'),
+            document.fonts.load('1em NotoSansBold')
+        ]).then(function() { 
+            window.__fontsReady = true; 
+        }).catch(function() {
+            // Fallback so it doesn't hang forever
+            window.__fontsReady = true;
+        });
+    </script>
 </head>
 <body>
-  <!-- Font-warming elements: visibility:hidden ensures layout + font-load without rendering -->
-  <div style="position:fixed;top:-9999px;visibility:hidden;font-family:'NotoSans',sans-serif;font-weight:400">x</div>
-  <div style="position:fixed;top:-9999px;visibility:hidden;font-family:'NotoSans',sans-serif;font-weight:700">x</div>
+  <!-- Font-warming: visibility:hidden keeps layout so Chromium processes all three font faces -->
+<div style="font-family:'NotoSans'; opacity:0.01; position:absolute; top:-100px;">Load Regular</div>
+    <div style="font-family:'NotoSansBold'; opacity:0.01; position:absolute; top:-100px;">Load Bold</div>
   ${page1(data)}
   ${page2(data)}
   ${page3(data)}

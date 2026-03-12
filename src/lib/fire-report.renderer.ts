@@ -12,6 +12,8 @@ async function getBrowser(): Promise<Browser> {
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
+            "--font-render-hinting=none", // Disables thinning of fonts
+            "--disable-font-subpixel-positioning"
         ],
     });
     logger.info("Puppeteer browser launched");
@@ -24,10 +26,10 @@ export async function renderPDF(htmlContent: string): Promise<Buffer> {
     try {
         // Set viewport to exact A4 dimensions at 96 CSS DPI (210mm × 297mm)
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-        await page.setContent(htmlContent, { waitUntil: "networkidle0", timeout: 30_000 });
+        await page.setContent(htmlContent, { waitUntil: "networkidle0", timeout: 30000 });
         // Wait for all custom fonts (base64 @font-face) to be fully loaded before printing.
         // window.__fontsReady is set by a <script> in the HTML once document.fonts.ready resolves.
-        await page.waitForFunction("window.__fontsReady === true", { timeout: 10_000 });
+        await page.waitForFunction("window.__fontsReady === true", { timeout: 10000 });
         const pdf = await page.pdf({
             format: "A4",
             printBackground: true,

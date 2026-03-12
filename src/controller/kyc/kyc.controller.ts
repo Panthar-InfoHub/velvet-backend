@@ -8,6 +8,7 @@ import { kyc_session_service } from "../../services/kyc/kyc.session.service.js";
 import { kyc_type_service } from "../../services/kyc/kyc.type.service.js";
 import { mfkyc_identity_service } from "../../services/kyc/mfkyc.identity.service.js";
 import { user_service } from "../../services/user.service.js";
+import { MfKycIdentity } from "../../prisma/generated/prisma/client.js";
 
 class KycControllerClass {
 
@@ -230,6 +231,17 @@ class KycControllerClass {
 
             logger.info("Digilocker data upserted to MfKycIdentity for user ID: ", user_id);
 
+            // hit finnsys POI, POA and Corr Address update APIs in sequence 
+            const address_data = this.extract_poi_data(user_mf_kyc_identity);
+            const poi_res = await kyc_finnsys_service.update_poi(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
+            const poa_res = await kyc_finnsys_service.update_poa(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
+            const corr_res = await kyc_finnsys_service.update_corr_poa_address(user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
+
+
+            logger.debug(` Poi res ==> `, poi_res)
+            logger.debug(` Poa res ==> `, poa_res)
+            logger.debug(` Corr res ==> `, corr_res)
+
             res.status(200).json({
                 success: true,
                 message: "Digilocker data fetched successfully",
@@ -271,12 +283,12 @@ class KycControllerClass {
                 kyc_finnsys_service.update_kyc_data(
                     kyc_data,
                     user_kyc_session.mfKycSessions.kyc_access_token,
-                    user_kyc_session.mfKycSessions.merchant_id!,
+                    user_kyc_session?.mfKycSessions?.merchant_id!,
                     `${inv_id}`
                 ),
                 kyc_finnsys_service.update_fatca_data(
                     user_kyc_session.mfKycSessions.kyc_access_token,
-                    user_kyc_session.mfKycSessions.merchant_id!,
+                    user_kyc_session?.mfKycSessions?.merchant_id!,
                     `${inv_id}`
                 )
             ]);
@@ -334,8 +346,8 @@ class KycControllerClass {
 
 
             // Finnsys call :
-            type === "photo" ? await kyc_finnsys_service.update_photo(img_url, user_kyc_session.mfKycSessions.kyc_access_token, user_kyc_session.mfKycSessions.merchant_id!, user_id) :
-                await kyc_finnsys_service.update_signature(img_url, user_kyc_session.mfKycSessions.kyc_access_token, user_kyc_session.mfKycSessions.merchant_id!, user_id);
+            type === "photo" ? await kyc_finnsys_service.update_photo(img_url, user_kyc_session.mfKycSessions.kyc_access_token, user_kyc_session?.mfKycSessions?.merchant_id!, user_id) :
+                await kyc_finnsys_service.update_signature(img_url, user_kyc_session.mfKycSessions.kyc_access_token, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
 
             // Update the document URL in the KYC session
             await mfkyc_identity_service.update_identity(user_id, {
@@ -370,7 +382,7 @@ class KycControllerClass {
 
             const contract_response = await kyc_finnsys_service.create_contract_pdf(
                 user_kyc_session.mfKycSessions.kyc_access_token,
-                user_kyc_session.mfKycSessions.merchant_id!,
+                user_kyc_session?.mfKycSessions?.merchant_id!,
                 user_id
             );
 
@@ -413,12 +425,12 @@ class KycControllerClass {
             const [esign_response, verification_response] = await Promise.allSettled([
                 kyc_finnsys_service.save_esign_pdf(
                     user_kyc_session.mfKycSessions.kyc_access_token,
-                    user_kyc_session.mfKycSessions.merchant_id!,
+                    user_kyc_session?.mfKycSessions?.merchant_id!,
                     user_id
                 ),
                 kyc_finnsys_service.execute_verification(
                     user_kyc_session.mfKycSessions.kyc_access_token,
-                    user_kyc_session.mfKycSessions.merchant_id!,
+                    user_kyc_session?.mfKycSessions?.merchant_id!,
                     user_id
                 )
             ]);
@@ -453,6 +465,26 @@ class KycControllerClass {
             logger.error("Error verifying KYC: ", error);
             next(error);
             return;
+        }
+    }
+
+
+
+    //// Helper methods :
+
+    // 1. Extract POI data from mfkyc identity response and call Finnsys API to update POI
+    private extract_poi_data = (user_mf_kyc_identity: MfKycIdentity) => {
+
+        return {
+            type: "aadhaarDigiLocker",
+            name: user_mf_kyc_identity.full_name || "",
+            uid: user_mf_kyc_identity.uid || "",
+            address: user_mf_kyc_identity.address_line || "",
+            city: user_mf_kyc_identity.city || "",
+            state: user_mf_kyc_identity.state || "",
+            district: user_mf_kyc_identity.district || "",
+            pincode: user_mf_kyc_identity.pincode || "",
+            dob: user_mf_kyc_identity.dob || ""
         }
     }
 }

@@ -1,6 +1,7 @@
 import { db } from "../../server.js";
 import type { Prisma } from "../../prisma/generated/prisma/client.js";
 import { map_digilocker_to_identity, type DigilockerData } from "../../lib/zod-schemas/finnsys.schema.js";
+import logger from "../../middleware/logger.js";
 
 export type { DigilockerData };
 
@@ -41,13 +42,19 @@ class MFKycIdentityServiceClass {
 
 
     get_verified_details = async (user_id: string, pan_no: string) => {
-        return await db.mfKycIdentity.findUnique({
-            where: {
-                user_id,
-                pan_no,
-                is_final_confirmed: true
-            }
-        });
+        try {
+            return await db.mfKycIdentity.findUnique({
+                where: {
+                    user_id,
+                    pan_no,
+                    is_final_confirmed: true
+                }
+            });
+        } catch (error) {
+            logger.error("Error in fetching verified KYC details ==> ", error);
+            throw error;
+        }
+
     }
 
     confirm_identity = async (user_id: string) => {

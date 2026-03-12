@@ -1,11 +1,15 @@
 import axios from "axios";
 import { env } from "../../lib/config-env.js";
+import logger from "../../middleware/logger.js";
+import AppError from "../../middleware/error.middleware.js";
 
 class KycFinnsysServiceClass {
     kyc_base_url: string;
+    finnsys_base_url: string;
 
     constructor() {
         this.kyc_base_url = `${env.KYC_BASE_URL}/kyc/v1`;
+        this.finnsys_base_url = `${env.KYC_BASE_URL}`;
     }
 
 
@@ -62,6 +66,7 @@ class KycFinnsysServiceClass {
     }
 
 
+
     private update_form = async (kyc_access_token: string, merchant_id: string, inv_id: string, type: string, data: object) => {
         const payload = {
             arn: env.ARN,
@@ -76,6 +81,45 @@ class KycFinnsysServiceClass {
         });
         return response.data;
     }
+
+    // Background hitting POI, POA and Corresponsing address apis of finnsys
+    // POI : "type": "identityProof", data from mfkyc identiy that we saved in our db from digilocker response
+    update_poi = async (poi_data: any, kyc_access_token: string, merchant_id: string, inv_id: string) => {
+        try {
+            return this.update_form(kyc_access_token, merchant_id, inv_id, "identityProof", {
+                type: "identityProof",
+                ...poi_data
+            });
+        } catch (error) {
+            logger.error("Error in updating POI data ==> ", error);
+            throw error;
+        }
+    }
+
+    update_poa = async (poa_data: any, kyc_access_token: string, merchant_id: string, inv_id: string) => {
+        try {
+            return this.update_form(kyc_access_token, merchant_id, inv_id, "addressProof", {
+                type: "aadhaarDigiLocker",
+                ...poa_data
+            });
+        } catch (error) {
+            logger.error("Error in updating POA data ==> ", error);
+            throw error;
+        }
+    }
+
+    update_corr_poa_address = async (kyc_access_token: string, merchant_id: string, inv_id: string) => {
+        try {
+            return this.update_form(kyc_access_token, merchant_id, inv_id, "corrAddressProof", {
+                sameAsPermanent: "true"
+            });
+        } catch (error) {
+            logger.error("Error in updating corresponding POA address data ==> ", error);
+            throw error;
+        }
+    }
+
+
 
     update_kyc_data = async (kyc_data: any, kyc_access_token: string, merchant_id: string, inv_id: string) => {
         return this.update_form(kyc_access_token, merchant_id, inv_id, "kycdata", {
@@ -146,6 +190,23 @@ class KycFinnsysServiceClass {
             service: "verificationEngine",
             merchantId: merchant_id
         });
+    }
+
+
+    pan_verification = async (pan_number: string) => {
+
+        try {
+            const response = await axios.post(`${this.finnsys_base_url}/icici/v1/checkKyc`, {
+                "arn": Number(env.ARN),
+                "firstPan": pan_number,
+                "taxStatus": "01"
+            });
+            return response.data;
+        } catch (error) {
+            logger.error("Error in PAN verification with Finnsys ==> ", error);
+            throw error;
+        }
+
     }
 }
 

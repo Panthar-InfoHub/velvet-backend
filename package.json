@@ -7,7 +7,8 @@
     "build": "tsc && cp -r src/lib/fonts dist/lib/",
     "dev": "nodemon --watch src --ext ts --exec \"npm run build && node ./dist/server.js\"",
     "gcp-build": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build",
-    "start": "npx prisma migrate deploy && node dist/server.js"
+    "start": "npx prisma migrate deploy && node dist/server.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "keywords": [],
   "author": "",
