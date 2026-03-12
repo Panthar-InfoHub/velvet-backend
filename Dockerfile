@@ -15,23 +15,19 @@ WORKDIR /app
 # 2. Copy dependency files
 COPY package*.json ./
 
-# 3. Create the 'src' directory so the path 'src/prisma' exists
-RUN mkdir -p src
-
-# 4. Copy the prisma folder into 'src/prisma' (Matches your exact tree)
-COPY src/prisma ./src/prisma
-
-# 5. Install & Generate
+# 3. Install ALL dependencies first
 RUN npm ci
-RUN npx prisma generate --schema=./src/prisma/schema.prisma
 
-# 6. Copy everything else (including the rest of src)
+# 4. Copy the ENTIRE project (This includes your models in src/prisma)
 COPY . .
 
-# 7. Build the app (tsc will now find ../../prisma/generated)
+# 5. Generate Prisma Client (Now it has the full schema with your 'user' models)
+RUN npx prisma generate --schema=./src/prisma/schema.prisma
+
+# 6. Build the app (tsc will now see the models and properties)
 RUN npm run build
 
-# 8. Bundle Chrome
+# 7. Bundle Chrome
 RUN npx puppeteer browsers install chrome
 
 EXPOSE 8080
