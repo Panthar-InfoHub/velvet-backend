@@ -1,0 +1,8 @@
+[[build.buildpacks]]
+  uri = "google.utils.apt"
+
+[[build.buildpacks]]
+  uri = "google.nodejs.runtime"
+
+[[build.buildpacks]]
+  uri = "google.nodejs.npm"

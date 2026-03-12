@@ -24,8 +24,8 @@ const fmt_in = (v: number): string =>
 
 const pct = (v: number): string => `${v.toFixed(1)}%`;
 
-const rs = (val: string, color = "#1F2937", size = "inherit") =>
-  `<span style="color:${color};font-size:${size}">&#x20B9;</span>${val}`;
+const rs = (val: string, color = "#111827", size = "inherit") =>
+  `<span style="color:${color};font-size:${size};font-family:'NotoSansBold',sans-serif;font-weight:normal;">&#x20B9;</span>${val}`;
 
 function header(quarter: string, name: string, age: number, city: string): string {
   return `
@@ -260,9 +260,11 @@ function getCSS(regularB64: string, boldB64: string): string {
     .tbl { width: 100%; border-collapse: collapse; flex-shrink: 0; }
     .tbl thead tr { background: #F9FAFB; border-bottom: 2px solid #D1D5DB; }
     .tbl th { font-size: 8px; padding: 6px 4px; color: #111827; text-align: left; }
-    .tbl td { font-size: 8px; padding: 5px 4px; color: #374151; border-bottom: 0.5px solid #E5E7EB; }
+    .tbl td { font-size: 8px; padding: 5px 4px; color: #111827; border-bottom: 0.5px solid #E5E7EB; }
     .tbl tr:nth-child(even) td { background: #FAFAFA; }
     .tbl .text-right { text-align: right; }
+    .tbl-tight td { padding: 3px 4px !important; font-size: 7.5px !important; color: #111827 !important; }
+    .tbl-tight th { padding: 3px 4px !important; font-size: 8px !important; }
     .tbl .green { color: ${GREEN}; font-weight: bold; }
 
     .metric-row { display: flex; justify-content: space-between; padding: 2px 0; }
@@ -424,7 +426,7 @@ function page2(data: VelvetReportViewData): string {
 
       ${snapshot.fiYear ? `<div style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-bottom:6px;flex-shrink:0">Projected FI in Year ${snapshot.fiYear} at FIRE % &ge; 100% (Age ${snapshot.fiAge})</div>` : ""}
 
-      <table class="tbl">
+      <table class="tbl tbl-tight">
         <thead>
           <tr>
             <th style="width:9%">Year</th>
