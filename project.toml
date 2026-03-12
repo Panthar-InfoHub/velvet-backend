@@ -1,6 +1,6 @@
 [[build.buildpacks]]
-  # Use the explicit, full URI for the apt buildpack
-  uri = "docker.io/googlecloudplatform/buildpacks:google.utils.apt"
+  # This is the direct internal GCR path for the Apt utility
+  uri = "gcr.io/google-22/utils/apt"
 
 [[build.buildpacks]]
   uri = "google.nodejs.runtime"
