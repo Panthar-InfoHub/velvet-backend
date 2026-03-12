@@ -4,5 +4,6 @@ const { join } = require('path');
  * @type {import("puppeteer").Configuration}
  */
 module.exports = {
-    cacheDirectory: '/tmp/.cache/puppeteer',
+    // Bundles Chrome into the permanent image so it survives the deploy
+    cacheDirectory: join(__dirname, '.cache', 'puppeteer'),
 };
