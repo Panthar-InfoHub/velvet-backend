@@ -19,9 +19,9 @@ RUN npm ci
 # 3. Copy EVERYTHING into the container
 COPY . .
 
-# 4. FIX: Provide the dummy DATABASE_URL inline to satisfy the generator
-# This fixes the "Cannot resolve environment variable" error from your last build.
-RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate --schema=./src/prisma/schema.prisma
+# 4. Provide a dummy DATABASE_URL so Prisma can generate at build time.
+# Do not point to schema.prisma directly because this project uses a schema folder.
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # 5. Build the TypeScript code
 RUN npm run build
