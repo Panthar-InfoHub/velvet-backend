@@ -9,6 +9,8 @@ const GOLD = "#D4A574";
 const GREEN = "#22C55E";
 const RED = "#EF4444";
 const GRAY = "#6B7280";
+const PAGE_WIDTH_MM = 230;
+const PAGE_HEIGHT_MM = 330;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function fontB64(filename: string): string {
@@ -127,25 +129,36 @@ function pieChart(data: { name: string; value: number; percentage: number }[], s
 }
 
 function barChart(have: number, recommended: number, haveColor: string, recColor: string, unit: "Cr" | "L"): string {
-  const W = 200, H = 120, PAD_L = 42, PAD_B = 24, PAD_T = 10;
+  const W = 250, H = 145, PAD_L = 50, PAD_B = 28, PAD_T = 10;
   const chartW = W - PAD_L - 12, chartH = H - PAD_B - PAD_T;
   const maxVal = Math.max(have, recommended, 1);
+  const roughStep = maxVal / 4;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
+  const normalized = roughStep / magnitude;
+  const stepMultiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = stepMultiplier * magnitude;
+  const axisMax = Math.max(step * 2, Math.ceil(maxVal / step) * step);
+  const ticks: number[] = [];
+  for (let v = 0; v <= axisMax + step * 0.001; v += step) ticks.push(v);
+
   const barW = chartW / 4, gap = chartW / 6;
-  const haveH = (have / maxVal) * chartH, recH = (recommended / maxVal) * chartH;
+  const haveH = (have / axisMax) * chartH, recH = (recommended / axisMax) * chartH;
   const haveX = PAD_L + gap, recX = PAD_L + gap + barW + gap;
-  const fmt = (v: number) => unit === "Cr" ? `${(v / 10_000_000).toFixed(1)} Cr` : `${(v / 100_000).toFixed(0)} L`;
-  const ticks = [0, maxVal / 2, maxVal];
+  const fmt = (v: number) => {
+    if (unit === "Cr") return `${(v / 10_000_000).toFixed(1)} Cr`;
+    return `${(v / 100_000).toFixed(v >= 10_00_000 ? 0 : 1)} L`;
+  };
   const gridLines = ticks.map(tv => {
-    const y = PAD_T + chartH - (tv / maxVal) * chartH;
+    const y = PAD_T + chartH - (tv / axisMax) * chartH;
     return `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${W - 12}" y2="${y.toFixed(1)}" stroke="#E5E7EB" stroke-width="0.5"/>
-                <text x="${PAD_L - 4}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="7" fill="${GRAY}">${fmt(tv)}</text>`;
+                <text x="${PAD_L - 4}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="8" fill="${GRAY}">${fmt(tv)}</text>`;
   }).join("");
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block">
       ${gridLines}
       <rect x="${haveX.toFixed(1)}" y="${(PAD_T + chartH - haveH).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(haveH, 0).toFixed(1)}" fill="${haveColor}" rx="2"/>
       <rect x="${recX.toFixed(1)}" y="${(PAD_T + chartH - recH).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(recH, 0).toFixed(1)}" fill="${recColor}" rx="2"/>
-      <text x="${(haveX + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="7" fill="${GRAY}">Current</text>
-      <text x="${(recX + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="7" fill="${GRAY}">Recommended</text>
+      <text x="${(haveX + barW / 2).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="9" fill="${GRAY}">Current</text>
+      <text x="${(recX + barW / 2).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="9" fill="${GRAY}">Recommended</text>
     </svg>`;
 }
 
@@ -167,7 +180,7 @@ function getCSS(regularB64: string, boldB64: string): string {
     }
 
     /* 2. BASE RESET & PRINT SETTINGS */
-    @page { size: A4; margin: 0; }
+    @page { size: ${PAGE_WIDTH_MM}mm ${PAGE_HEIGHT_MM}mm; margin: 0; }
     * { 
         box-sizing: border-box; 
         margin: 0; 
@@ -205,7 +218,7 @@ function getCSS(regularB64: string, boldB64: string): string {
 
     /* 4. LAYOUT & STRUCTURE */
     .page {
-      width: 210mm; height: 297mm;
+      width: ${PAGE_WIDTH_MM}mm; height: ${PAGE_HEIGHT_MM}mm;
       padding: 14mm 14mm 28mm 14mm;
       position: relative; overflow: hidden;
       page-break-after: always;
@@ -214,6 +227,7 @@ function getCSS(regularB64: string, boldB64: string): string {
     .page:last-child { page-break-after: avoid; }
 
     .page-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .page-body-with-footnotes { padding-bottom: 22mm; }
 
     .row2-fill { display: flex; gap: 10px; flex: 1; min-height: 0; margin-bottom: 10px; }
     .row2-fill > * { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -263,8 +277,8 @@ function getCSS(regularB64: string, boldB64: string): string {
     .tbl td { font-size: 8px; padding: 5px 4px; color: #111827; border-bottom: 0.5px solid #E5E7EB; }
     .tbl tr:nth-child(even) td { background: #FAFAFA; }
     .tbl .text-right { text-align: right; }
-    .tbl-tight td { padding: 3px 4px !important; font-size: 7.5px !important; color: #111827 !important; }
-    .tbl-tight th { padding: 3px 4px !important; font-size: 8px !important; }
+    .tbl-tight td { padding: 3px 4px !important; font-size: 9px !important; color: #111827 !important; }
+    .tbl-tight th { padding: 3px 4px !important; font-size: 10px !important; }
     .tbl .green { color: ${GREEN}; font-weight: bold; }
 
     .metric-row { display: flex; justify-content: space-between; padding: 2px 0; }
@@ -296,6 +310,8 @@ function page1(data: VelvetReportViewData): string {
   const nwPos = parseFloat(qoqChanges.netWorth) >= 0;
   const firePos = parseFloat(qoqChanges.firePercent) >= 0;
   const fireBarW = Math.min(snapshot.firePercentage, 100);
+  const page1CardBg = "#F3F4F6";
+  const page1CardBorder = "#E7E9EE";
   const nwHistory = snapshot.netWorthHistory.map(h => ({ label: h.quarter, value: h.value }));
   const fireHistory = snapshot.fireHistory.map(h => ({ label: h.quarter, value: h.fire / 100_000 }));
 
@@ -310,56 +326,58 @@ function page1(data: VelvetReportViewData): string {
         <div class="insight"><b>Executive Insight:</b> Net worth ${nwPos ? "grew" : "declined"} ${Math.abs(parseFloat(qoqChanges.netWorth))}% QoQ to ${rs(fmt_cr(snapshot.netWorth), NAVY)} with steady financial asset accumulation at age ${clientData.age}.</div>
       </div>
 
-      <!-- Row 1: Net Worth + FIRE Status — flex:1.2 so slightly taller than sparkline row -->
-      <div style="display:flex;gap:10px;flex:1;min-height:0">
-        <div class="card" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px">
-          <div class="card-label" style="font-size:9px">Current Net Worth</div>
-          <div style="font-size:46px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin:10px 0 6px;line-height:1">${rs(fmt_cr(snapshot.netWorth), NAVY, "40px")}</div>
-          <span class="${nwPos ? "badge-pos" : "badge-neg"}" style="font-size:9px;padding:3px 8px">${nwPos ? "↑" : "↓"} ${Math.abs(parseFloat(qoqChanges.netWorth)).toFixed(1)}%</span>
-          <div style="font-size:8.5px;color:${GRAY};margin-top:10px">Previous Quarter: ${rs(fmt_cr(snapshot.netWorthPrevQ), GRAY, "8px")}</div>
-          <div style="font-size:8px;color:${GRAY};margin-top:2px">Absolute Increase: ${rs(fmt_cr(snapshot.netWorth - snapshot.netWorthPrevQ), GRAY, "7.5px")}</div>
-        </div>
-        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:12px;background-color:#FEF3C7">
-          <div class="card-label" style="font-size:9px;margin-bottom:10px">Current FIRE<sup>1</sup> Status</div>
-          <div style="display:flex;gap:12px;margin-bottom:10px;">
-            <div style="flex:1">
-              <div style="font-size:8px;color:${GRAY}">FIRE Number<sup>2</sup></div>
-              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-top:2px">${rs(fmt_cr(snapshot.fireNumber), NAVY, "15px")}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+        <div style="display:flex;gap:10px;flex:1;min-height:0;align-items:stretch">
+          <div class="card" style="flex:1;display:flex;flex-direction:column;padding:14px;text-align:center;background:${page1CardBg};border:1px solid ${page1CardBorder}">
+            <div class="card-label" style="font-size:10px;text-align:left">Current Net Worth</div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0">
+              <div style="font-size:52px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};line-height:1">${rs(fmt_cr(snapshot.netWorth), NAVY, "44px")}</div>
+              <span class="${nwPos ? "badge-pos" : "badge-neg"}" style="font-size:9px;padding:3px 10px;margin-top:8px">${nwPos ? "↑" : "↓"} ${Math.abs(parseFloat(qoqChanges.netWorth)).toFixed(1)}%</span>
             </div>
-            <div style="flex:1">
-              <div style="font-size:8px;color:${GRAY}">FIRE %<sup>3</sup></div>
-              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD};margin-top:2px">${pct(snapshot.firePercentage)}</div>
+            <div style="font-size:8.5px;color:${GRAY};margin-top:4px">Previous Quarter: ${rs(fmt_cr(snapshot.netWorthPrevQ), GRAY, "8px")}</div>
+            <div style="font-size:8px;color:${GRAY};margin-top:3px">Absolute Increase: ${rs(fmt_cr(snapshot.netWorth - snapshot.netWorthPrevQ), GRAY, "7.5px")}</div>
+          </div>
+          <div class="card" style="flex:1;display:flex;flex-direction:column;padding:14px;background:${page1CardBg};border:1px solid ${page1CardBorder}">
+            <div class="card-label" style="font-size:10px">Current FIRE<sup>1</sup> Status</div>
+            <div style="display:flex;gap:10px;margin-top:6px">
+              <div style="flex:1">
+                <div style="font-size:8px;color:${GRAY}">FIRE Number<sup>2</sup></div>
+                <div style="font-size:30px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-top:2px;line-height:1">${rs(fmt_cr(snapshot.fireNumber), NAVY, "23px")}</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:8px;color:${GRAY}">FIRE %<sup>3</sup></div>
+                <div style="font-size:30px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GOLD};margin-top:2px;line-height:1">${pct(snapshot.firePercentage)}</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:8px;color:${GRAY}">Gap<sup>4</sup></div>
+                <div style="font-size:30px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED};margin-top:2px;line-height:1">${rs(fmt_cr(snapshot.fireGap), RED, "23px")}</div>
+              </div>
             </div>
-            <div style="flex:1">
-              <div style="font-size:8px;color:${GRAY}">Gap<sup>4</sup></div>
-              <div style="font-size:17px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED};margin-top:2px">${rs(fmt_cr(snapshot.fireGap), RED, "15px")}</div>
+            <div style="margin-top:8px">
+              <div class="progress-bg"><div class="progress-fill" style="width:${fireBarW}%"></div></div>
+              <div style="font-size:8.5px;color:${GRAY};margin-top:8px">Annual Expenses: ${rs(fmt_cr(snapshot.annualExpenses), GRAY, "8px")}</div>
+              <div style="font-size:8.5px;color:${GRAY};margin-top:2px">Monthly: ${rs(fmt_in(snapshot.monthlyExpenses), GRAY, "8px")}</div>
             </div>
           </div>
-          <div class="progress-bg"><div class="progress-fill" style="width:${fireBarW}%"></div></div>
-          <div style="font-size:8.5px;color:${GRAY};margin-top:8px">Annual Expenses: ${rs(fmt_cr(snapshot.annualExpenses), GRAY, "8px")}</div>
-          <div style="font-size:8.5px;color:${GRAY};margin-top:2px">Monthly: ${rs(fmt_in(snapshot.monthlyExpenses), GRAY, "8px")}</div>
         </div>
-      </div>
 
-      <!-- Row 2: QoQ sparklines — flex:1 fills remaining space -->
-      <div style="display:flex;gap:10px;flex:1;min-height:0">
-        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:10px">
-          <div class="card-label">QoQ Net Worth Change<sup>5</sup></div>
-          <div style="font-size:24px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${nwPos ? GREEN : RED};margin:2px 0">${nwPos ? "+" : ""}${qoqChanges.netWorth}%</div>
-          <div style="font-size:8px;color:${GRAY}">Quarter over Quarter</div>
-          <div style="flex:1;min-height:0;display:flex;align-items:center">
-            ${sparkline(nwHistory, GREEN, 430, 130)}
+        <div style="display:flex;gap:10px;flex:1;min-height:0;align-items:stretch">
+          <div class="card" style="flex:1;display:flex;flex-direction:column;padding:12px;background:${page1CardBg};border:1px solid ${page1CardBorder}">
+            <div class="card-label" style="font-size:10px">QoQ Net Worth Change<sup>5</sup></div>
+            <div style="font-size:48px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${nwPos ? GREEN : RED};margin-top:2px;line-height:1">${nwPos ? "+" : ""}${qoqChanges.netWorth}%</div>
+            <div style="font-size:9px;color:${GRAY};margin-top:4px">Quarter over Quarter</div>
+            <div style="height:112px;margin-top:6px">${sparkline(nwHistory, GREEN, 430, 112)}</div>
+            ${nwHistory.length >= 2 ? `<div style="font-size:8px;color:${GRAY};margin-top:4px">${nwHistory[nwHistory.length - 2]!.label}: ${rs(fmt_cr(nwHistory[nwHistory.length - 2]!.value * 100_000), GRAY, "7px")} &rarr; ${nwHistory[nwHistory.length - 1]!.label}: ${rs(fmt_cr(nwHistory[nwHistory.length - 1]!.value * 100_000), GRAY, "7px")}</div>` : ""}
           </div>
-          ${nwHistory.length >= 2 ? `<div style="font-size:7.5px;color:${GRAY};margin-top:2px">${nwHistory[nwHistory.length - 2]!.label}: ${rs(fmt_cr(nwHistory[nwHistory.length - 2]!.value * 100_000), GRAY, "7px")} &rarr; ${nwHistory[nwHistory.length - 1]!.label}: ${rs(fmt_cr(nwHistory[nwHistory.length - 1]!.value * 100_000), GRAY, "7px")}</div>` : ""}
-        </div>
-        <div class="card" style="flex:1;display:flex;flex-direction:column;padding:10px">
-          <div class="card-label">QoQ FIRE Score Change<sup>6</sup></div>
-          <div style="font-size:24px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${firePos ? GOLD : RED};margin:2px 0">${firePos ? "+" : ""}${qoqChanges.firePercent}%</div>
-          <div style="font-size:8px;color:${GRAY}">FIRE % Improvement</div>
-          <div style="flex:1;min-height:0;display:flex;align-items:center">
-            ${sparkline(fireHistory, GOLD, 430, 130)}
+          <div class="card" style="flex:1;display:flex;flex-direction:column;padding:12px;background:${page1CardBg};border:1px solid ${page1CardBorder}">
+            <div class="card-label" style="font-size:10px">QoQ FIRE Score Change<sup>6</sup></div>
+            <div style="font-size:48px;font-weight:700;font-family:'NotoSansBold','NotoSans',sans-serif;color:${firePos ? GOLD : RED};margin-top:2px;line-height:1">${firePos ? "+" : ""}${qoqChanges.firePercent}%</div>
+            <div style="font-size:9px;color:${GRAY};margin-top:4px">FIRE % Improvement</div>
+            <div style="height:112px;margin-top:6px">${sparkline(fireHistory, GOLD, 430, 112)}</div>
+            ${snapshot.fiYear
+      ? `<div style="font-size:8px;color:${GRAY};margin-top:4px">Projected FI: Year ${snapshot.fiYear} (Age ${snapshot.fiAge})</div>`
+      : ""}
           </div>
-          ${snapshot.fiYear ? `<div style="font-size:7.5px;color:${GRAY};margin-top:2px">Projected FI: Year ${snapshot.fiYear} (Age ${snapshot.fiAge})</div>` : ""}
         </div>
       </div>
 
@@ -398,7 +416,7 @@ function page2(data: VelvetReportViewData): string {
   return `
   <div class="page">
     ${header(currentQuarter, clientData.name, clientData.age, clientData.city)}
-    <div class="page-body">
+    <div class="page-body page-body-with-footnotes">
       <div class="page-title">F.I.R.E Calculations</div>
       <div class="insight"><b>Executive Insight:</b> Current FIRE progress at ${pct(snapshot.firePercentage)}${snapshot.fiYear ? ` with projected financial independence by ${snapshot.fiYear} (age ${snapshot.fiAge}).` : ". Keep building your corpus consistently."}</div>
 
@@ -426,19 +444,21 @@ function page2(data: VelvetReportViewData): string {
 
       ${snapshot.fiYear ? `<div style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-bottom:6px;flex-shrink:0">Projected FI in Year ${snapshot.fiYear} at FIRE % &ge; 100% (Age ${snapshot.fiAge})</div>` : ""}
 
-      <table class="tbl tbl-tight">
-        <thead>
-          <tr>
-            <th style="width:9%">Year</th>
-            <th class="text-right" style="width:19%">Portfolio Value</th>
-            <th class="text-right" style="width:16%">Expenses</th>
-            <th class="text-right" style="width:15%">Goal Payouts</th>
-            <th class="text-right" style="width:19%">FIRE Number</th>
-            <th class="text-right" style="width:10%">FIRE %</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <table class="tbl tbl-tight" style="height:100%">
+          <thead>
+            <tr>
+              <th style="width:9%">Year</th>
+              <th class="text-right" style="width:19%">Portfolio Value</th>
+              <th class="text-right" style="width:16%">Expenses</th>
+              <th class="text-right" style="width:15%">Goal Payouts</th>
+              <th class="text-right" style="width:19%">FIRE Number</th>
+              <th class="text-right" style="width:10%">FIRE %</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     </div>
 
     <div class="footnotes-block">
@@ -478,27 +498,27 @@ function page3(data: VelvetReportViewData): string {
   return `
   <div class="page">
     ${header(currentQuarter, clientData.name, clientData.age, clientData.city)}
-    <div class="page-body">
+    <div class="page-body page-body-with-footnotes">
       <div class="page-title">Financial Statement</div>
       <div class="insight"><b>Executive Insight:</b> Healthy savings rate of ${pct(savingsRate)} with monthly surplus of ${rs(fmt_in(monthlySurplus))} supporting wealth growth.</div>
 
       <div class="section-title" style="text-align:center">Profit / Loss (Monthly)</div>
-      <div class="row2">
+      <div class="row2" style="flex:1;min-height:0">
         <div class="ins-box" style="background:#F0FDF4;border:1.5px solid ${GREEN}">
-          <div class="card-label">Income&sup1;&sup3;</div>
-          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${rs(fmt_in(monthlyIncome), GREEN, "28px")}</div>
+          <div class="card-label" style="font-size:9px">Income&sup1;&sup3;</div>
+          <div style="font-size:36px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${GREEN}">${rs(fmt_in(monthlyIncome), GREEN, "32px")}</div>
           <div class="divider"></div>
-          <div class="metric-row"><span class="metric-label">Monthly Income</span><span class="metric-value">${rs(fmt_in(monthlyIncome), "#1F2937", "8px")}</span></div>
+          <div class="metric-row"><span class="metric-label" style="font-size:9px">Monthly Income</span><span class="metric-value">${rs(fmt_in(monthlyIncome), "#1F2937", "9px")}</span></div>
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Income</span><span style="font-size:8px">${rs(fmt_in(monthlyIncome), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:9px">Total Income</span><span style="font-size:9px">${rs(fmt_in(monthlyIncome), "#1F2937", "9px")}</span></div>
         </div>
         <div class="ins-box" style="background:#FEF2F2;border:1.5px solid ${RED}">
-          <div class="card-label">Expenses&sup1;&sup4;</div>
-          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED}">${rs(fmt_in(monthlyExpense), RED, "28px")}</div>
+          <div class="card-label" style="font-size:9px">Expenses&sup1;&sup4;</div>
+          <div style="font-size:36px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${RED}">${rs(fmt_in(monthlyExpense), RED, "32px")}</div>
           <div class="divider"></div>
           ${expenseRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Expenses</span><span style="font-size:8px">${rs(fmt_in(monthlyExpense), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:9px">Total Expenses</span><span style="font-size:9px">${rs(fmt_in(monthlyExpense), "#1F2937", "9px")}</span></div>
         </div>
       </div>
 
@@ -511,22 +531,22 @@ function page3(data: VelvetReportViewData): string {
       </div>
 
       <div class="section-title" style="text-align:center">Balance Sheet (As on ${currentQuarter})</div>
-      <div class="row2">
+      <div class="row2" style="flex:1;min-height:0">
         <div class="ins-box" style="background:#EFF6FF;border:1.5px solid ${NAVY}">
-          <div class="card-label">Assets&sup1;&sup7;</div>
-          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(balanceSheet.totalAssets), NAVY, "28px")}</div>
+          <div class="card-label" style="font-size:9px">Assets&sup1;&sup7;</div>
+          <div style="font-size:36px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${rs(fmt_cr(balanceSheet.totalAssets), NAVY, "32px")}</div>
           <div class="divider"></div>
           ${assetRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Assets</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalAssets), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:9px">Total Assets</span><span style="font-size:9px">${rs(fmt_cr(balanceSheet.totalAssets), "#1F2937", "9px")}</span></div>
         </div>
         <div class="ins-box" style="background:#FFF7ED;border:1.5px solid #F97316">
-          <div class="card-label">Liabilities&sup1;&sup8;</div>
-          <div style="font-size:32px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:#F97316">${rs(fmt_cr(balanceSheet.totalLiabilities), "#F97316", "28px")}</div>
+          <div class="card-label" style="font-size:9px">Liabilities&sup1;&sup8;</div>
+          <div style="font-size:36px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:#F97316">${rs(fmt_cr(balanceSheet.totalLiabilities), "#F97316", "32px")}</div>
           <div class="divider"></div>
           ${liabRows}
           <div class="divider"></div>
-          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:8px">Total Liabilities</span><span style="font-size:8px">${rs(fmt_cr(balanceSheet.totalLiabilities), "#1F2937", "8px")}</span></div>
+          <div class="metric-row" style="font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif"><span style="font-size:9px">Total Liabilities</span><span style="font-size:9px">${rs(fmt_cr(balanceSheet.totalLiabilities), "#1F2937", "9px")}</span></div>
         </div>
       </div>
 
@@ -576,7 +596,7 @@ function page4(data: VelvetReportViewData): string {
     const q = trendQoQ([...cat.trend]);
     const td = [...cat.trend].map(p => ({ label: p.q, value: p.value }));
     return `
-        <div class="card" style="margin-bottom:8px;flex-shrink:0">
+        <div class="card" style="flex:1;min-height:0">
           <div style="display:flex;justify-content:space-between">
             <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY}">${cat.label}</span>
             <span style="font-size:9px;color:${parseFloat(q.pct) >= 0 ? GREEN : RED}">${parseFloat(q.pct) >= 0 ? "+" : ""}${q.pct}% QoQ</span>
@@ -589,7 +609,7 @@ function page4(data: VelvetReportViewData): string {
   return `
   <div class="page">
     ${header(currentQuarter, clientData.name, clientData.age, clientData.city)}
-    <div class="page-body">
+    <div class="page-body page-body-with-footnotes">
       <div class="page-title">Net Worth</div>
       <div class="insight"><b>Executive Insight:</b> Diversified portfolio across asset classes at age ${clientData.age}.</div>
 
@@ -608,7 +628,9 @@ function page4(data: VelvetReportViewData): string {
       </div>
 
       <div class="section-title">Quarterly Performance Trends (Last 3 Quarters) &mdash; *Estimated</div>
-      ${catCards}
+      <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+        ${catCards}
+      </div>
     </div>
 
     <div class="footnotes-block">
@@ -644,7 +666,7 @@ function page5(data: VelvetReportViewData): string {
   return `
   <div class="page">
     ${header(currentQuarter, clientData.name, clientData.age, clientData.city)}
-    <div class="page-body">
+    <div class="page-body page-body-with-footnotes">
       <div class="page-title">Goals Planning</div>
       <div class="insight"><b>Executive Insight:</b> Total goal funding requirement of ${rs(fmt_in(goalsTotal.monthlySavingsReq))}/month across ${goals.length} goals.</div>
 
@@ -673,17 +695,19 @@ function page5(data: VelvetReportViewData): string {
         </tbody>
       </table>
 
-      <div class="section-title">Year-by-Year Savings Requirement&sup2;&sup4;</div>
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th style="width:20%">Year</th>
-            <th class="text-right" style="width:40%">Monthly Required</th>
-            <th class="text-right" style="width:40%">Yearly Required</th>
-          </tr>
-        </thead>
-        <tbody>${yrRows}</tbody>
-      </table>
+      <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <div class="section-title">Year-by-Year Savings Requirement</div>
+        <table class="tbl" style="height:100%">
+          <thead>
+            <tr>
+              <th style="width:20%">Year</th>
+              <th class="text-right" style="width:40%">Monthly Required</th>
+              <th class="text-right" style="width:40%">Yearly Required</th>
+            </tr>
+          </thead>
+          <tbody>${yrRows}</tbody>
+        </table>
+      </div>
     </div>
 
     <div class="footnotes-block">
@@ -702,6 +726,8 @@ function page6(data: VelvetReportViewData): string {
   const { currentQuarter, clientData, insurance, summaryQuarter } = data;
   const termGap = insurance.termLife.gap > 0;
   const healthGap = insurance.health.gap > 0;
+  const termTarget = Math.max(insurance.termLife.recommended, insurance.termLife.have);
+  const healthTarget = Math.max(insurance.health.recommended, insurance.health.have);
 
   return `
   <div class="page">
@@ -711,7 +737,7 @@ function page6(data: VelvetReportViewData): string {
       <div class="insight"><b>Executive Insight:</b> ${termGap ? `Term life gap of ${rs(fmt_cr(insurance.termLife.gap))} identified. ` : "Term life adequately covered. "}${healthGap ? `Health gap of ${rs(fmt_cr(insurance.health.gap))} identified.` : `Health cover of ${rs(fmt_cr(insurance.health.have))} is adequate.`}</div>
 
       <div class="section-title">Term Life Insurance</div>
-      <div class="card" style="margin-bottom:10px;flex-shrink:0">
+      <div style="margin-bottom:10px;flex-shrink:0;background:#F3F4F6;border-radius:8px;padding:12px">
         <div style="display:flex;gap:12px">
           <div style="flex:1;display:flex;justify-content:center">${barChart(insurance.termLife.have, insurance.termLife.recommended, GOLD, NAVY, "Cr")}</div>
           <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
@@ -729,10 +755,18 @@ function page6(data: VelvetReportViewData): string {
             </div>
           </div>
         </div>
+        <div style="margin-top:10px;background:#EDE9E6;border-left:3px solid ${GOLD};border-radius:4px;padding:8px 10px">
+          <div style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-bottom:3px">Recommendation:</div>
+          <div style="font-size:8px;color:#374151;line-height:1.4">
+            ${termGap
+      ? `Increase term life cover to at least ${rs(fmt_cr(termTarget), NAVY, "8px")} to close the current shortfall of ${rs(fmt_cr(insurance.termLife.gap), RED, "8px")} and protect liabilities plus family expenses.`
+      : `Current term cover of ${rs(fmt_cr(insurance.termLife.have), NAVY, "8px")} is aligned with the recommended requirement.`}
+          </div>
+        </div>
       </div>
 
       <div class="section-title">Health Insurance</div>
-      <div class="card" style="margin-bottom:10px;flex-shrink:0">
+      <div style="margin-bottom:10px;flex-shrink:0;background:#F3F4F6;border-radius:8px;padding:12px">
         <div style="display:flex;gap:12px">
           <div style="flex:1;display:flex;justify-content:center">${barChart(insurance.health.have, insurance.health.recommended, GREEN, NAVY, "L")}</div>
           <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
@@ -748,6 +782,14 @@ function page6(data: VelvetReportViewData): string {
               <span style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif">${healthGap ? "Shortfall" : "Status"}</span>
               <span style="font-size:16px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${healthGap ? RED : GREEN}">${healthGap ? rs(fmt_cr(insurance.health.gap), RED, "14px") : "&#10003; Adequate"}</span>
             </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;background:${healthGap ? "#FEF2F2" : "#DCFCE7"};border-left:3px solid ${healthGap ? RED : GREEN};border-radius:4px;padding:8px 10px">
+          <div style="font-size:9px;font-weight:bold;font-family:'NotoSansBold','NotoSans',sans-serif;color:${NAVY};margin-bottom:3px">Status:</div>
+          <div style="font-size:8px;color:#374151;line-height:1.4">
+            ${healthGap
+      ? `Current health insurance of ${rs(fmt_cr(insurance.health.have), GREEN, "8px")} is below recommended ${rs(fmt_cr(healthTarget), NAVY, "8px")}. Increase by ${rs(fmt_cr(insurance.health.gap), RED, "8px")}.`
+      : `Current health insurance of ${rs(fmt_cr(insurance.health.have), GREEN, "8px")} is above the recommended minimum of ${rs(fmt_cr(healthTarget), NAVY, "8px")}. Coverage is adequate.`}
           </div>
         </div>
       </div>
@@ -784,7 +826,7 @@ function page6(data: VelvetReportViewData): string {
       </div>
     </div>
 
-    <div class="footnotes-block">
+    <div class="footnotes-block footnotes-inline">
       <div class="fn">&bull; Term Life = Max(15&times; Annual Income, Total Liabilities + 10&times; Annual Expenses)</div>
       <div class="fn">&bull; Health Insurance = Max(4&times; Monthly Income, 20L minimum for family)</div>
       <div class="fn"><b>26. Term Life:</b> Pure life cover | Max(15&times; Annual Income, Total Liabilities + 10&times; Annual Expenses)</div>

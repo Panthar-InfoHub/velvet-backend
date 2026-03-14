@@ -1,5 +1,5 @@
 model MfProduct {
-    id              String  @id @default(uuid())
+    id              String  @id @default(cuid())
     scheme_id       String
     isin            String?
     mapping_code    String // Remember this is real schema code : Unique code needed for most MF apis and NSE Apis : It's just Finnsys mother fuckers that mess with this so complain to them

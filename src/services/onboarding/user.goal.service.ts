@@ -3,6 +3,9 @@ import { UserGoalInput } from "../../lib/zod-schemas/goal.schema.js";
 import { db } from "../../server.js";
 import { env } from "../../lib/config-env.js";
 import logger from "../../middleware/logger.js";
+import type { Prisma } from "../../prisma/generated/prisma/client.js";
+
+type TxClient = Prisma.TransactionClient;
 
 class UserGoalServiceClass {
     finsys_api: string;
@@ -104,6 +107,42 @@ class UserGoalServiceClass {
 
         const res = await axios.get(this.finsys_api, { params });
         return res.data;
+    }
+
+    sync_db = async (user_id: string, goals: UserGoalInput[], tx: TxClient | typeof db = db) => {
+        await tx.userGoals.deleteMany({ where: { user_id } });
+        if (goals.length > 0) {
+            await tx.userGoals.createMany({
+                data: goals.map((goal) => ({ user_id, ...goal })),
+            });
+        }
+    }
+
+    sync_finsys = async (user: any, goals: UserGoalInput[]) => {
+        const db_goals = await db.userGoals.findMany({
+            where: { user_id: user.id },
+            select: { id: true, goal_type_id: true },
+        });
+
+        await Promise.all(goals.map(async (goal) => {
+            const db_goal = db_goals.find((g) => g.goal_type_id === goal.goal_type_id);
+            if (!db_goal) return;
+
+            const params = this.extract_params(user, goal);
+            try {
+                const res = await axios.get(this.finsys_api, { params });
+                logger.debug(`FinSys goal sync res for type ${goal.goal_type_id} ==> `, res.data);
+
+                if (res.data.results?.[0]?.gid) {
+                    await db.userGoals.update({
+                        where: { id: db_goal.id },
+                        data: { goal_id: parseInt(res.data.results[0].gid) },
+                    });
+                }
+            } catch (err) {
+                logger.error(`FinSys sync failed for goal_type_id ${goal.goal_type_id}:`, err);
+            }
+        }));
     }
 }
 

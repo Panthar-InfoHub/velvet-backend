@@ -5,6 +5,8 @@ import logger from "../middleware/logger.js";
 import { mututal_funds_service } from "../services/mutual-fund.service.js";
 import { redis, redis_buffer_client } from "../lib/redis.js";
 import { decompressAndFilter, get_mf_search_query } from "../lib/utils.js";
+import AppError from "../middleware/error.middleware.js";
+import { lumpsum_cart_zod_schema } from "../lib/types.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -132,6 +134,54 @@ class MutualFundControllerClass {
             return;
         } catch (error) {
             logger.error("Error in get_mutual_fund_history:", error);
+            next(error);
+            return;
+        }
+    }
+
+
+    add_to_lumpsum_cart = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const user = req.user;
+            logger.info(`Adding to lumpsum cart for user: ${user?.id}`);
+
+            const { amount, mf_product_id } = req.body;
+            if (!amount || !mf_product_id) {
+                logger.warn("Missing required fields in add_to_lumpsum_cart request body");
+                throw new AppError("Missing required fields: amount and mf_product_id are required", 400);
+            }
+
+            const mf_product = await mututal_funds_service.get_mutual_fund_by_id(mf_product_id);
+
+            const result = await mututal_funds_service.add_lumpsum_cart({
+                amc_code: mf_product?.amc_code || "",
+                amc_name: mf_product?.amc_name || "",
+                prod_code: mf_product?.platform_code || "",
+                prod_name: mf_product?.scheme_name || "",
+                txn_amount: amount,
+            }, {
+                log: user?.log as string,
+                pwd: user?.pwd as string
+            });
+
+            logger.debug("Result from add_to_lumpsum_cart service ==> ", result);
+
+            if (result.code != "1") {
+                logger.error("Failed to add to lumpsum cart, service response code: ", result.code);
+                throw new AppError("Failed to add to lumpsum cart", 500, "ADD_TO_CART_LUMPSUM_ERROR");
+            }
+
+            res.status(200).json({
+                success: true,
+                message: "Added to lumpsum cart successfully",
+                data: result
+            });
+            return;
+
+
+        } catch (error) {
+            logger.error("Error in add_to_lumpsum_cart controller ==> ", error);
             next(error);
             return;
         }

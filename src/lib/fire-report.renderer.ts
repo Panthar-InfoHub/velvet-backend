@@ -24,14 +24,15 @@ export async function renderPDF(htmlContent: string): Promise<Buffer> {
     const b = await getBrowser();
     const page = await b.newPage();
     try {
-        // Set viewport to exact A4 dimensions at 96 CSS DPI (210mm × 297mm)
-        await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+        // Use a larger viewport for clearer chart/text rasterization before PDF print.
+        await page.setViewport({ width: 1200, height: 1700, deviceScaleFactor: 1.5 });
         await page.setContent(htmlContent, { waitUntil: "networkidle0", timeout: 30000 });
         // Wait for all custom fonts (base64 @font-face) to be fully loaded before printing.
         // window.__fontsReady is set by a <script> in the HTML once document.fonts.ready resolves.
         await page.waitForFunction("window.__fontsReady === true", { timeout: 10000 });
         const pdf = await page.pdf({
-            format: "A4",
+            width: "230mm",
+            height: "330mm",
             printBackground: true,
             margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" },
         });

@@ -1,4 +1,7 @@
 import { db } from "../../server.js";
+import type { Prisma } from "../../prisma/generated/prisma/client.js";
+
+type TxClient = Prisma.TransactionClient;
 
 type PaginationOptions = {
     page?: number;
@@ -76,6 +79,15 @@ class UserLoanServiceClass {
                 user_id: user_id,
             },
         });
+    }
+
+    async sync(user_id: string, loans: any[], tx: TxClient | typeof db = db) {
+        await tx.userLoan.deleteMany({ where: { user_id } });
+        if (loans.length > 0) {
+            await tx.userLoan.createMany({
+                data: loans.map((loan) => ({ user_id, ...loan })),
+            });
+        }
     }
 }
 

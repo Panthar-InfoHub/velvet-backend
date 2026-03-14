@@ -3,6 +3,9 @@ import logger from "../middleware/logger.js";
 import { db } from "../server.js";
 import pLimit from "p-limit";
 import type { MfNavHistoryCreateManyInput, MfProductOrderByWithRelationInput, MfProductWhereInput } from "../prisma/generated/prisma/models.js";
+import { Lumpsum_cart_data } from "../lib/types.js";
+import { env } from "../lib/config-env.js";
+import AppError from "../middleware/error.middleware.js";
 
 
 export type pagination = {
@@ -14,8 +17,11 @@ export type pagination = {
 
 class MututalFundServiceClass {
 
+    finnsys_base_url: string;
 
-
+    constructor() {
+        this.finnsys_base_url = env.finsys_base_api;
+    }
 
 
 
@@ -55,8 +61,6 @@ class MututalFundServiceClass {
             }
         };
     }
-
-
     get_mutual_fund_by_id = async (id: string) => {
         return await db.mfProduct.findUnique({
             where: { id },
@@ -88,9 +92,6 @@ class MututalFundServiceClass {
         });
     }
 
-
-
-
     get_only_mf_product = async (id: string) => {
         return await db.mfProduct.findUnique({
             where: { id },
@@ -101,6 +102,35 @@ class MututalFundServiceClass {
 
 
 
+    // Purchasing service lumpsum and sip to finnsys cart
+
+    add_lumpsum_cart = async (lumpsum_data: Lumpsum_cart_data, user_data: { log: string, pwd: string }) => {
+        try {
+
+            // https://jantanivesh.com/finnsys/app/master.service.asp?log=nimit691&pwd=64119&svc=addcartlumpsum&sub_txn_type=N&amc_code=D&amc_name=Edelweiss Mutual Fund&prod_code=EDEIRD-DR&prod_name=EDELWEISS EQUITY SAVINGS FUND - REGULAR PLAN - IDCW REINVESTMENT&reinv_flag=Y&txn_amount=10000
+            const response = await axios.get(`${this.finnsys_base_url}/finnsys/app/master.service.asp`, {
+                params: {
+                    log: user_data.log,
+                    pwd: user_data.pwd,
+                    svc: 'addcartlumpsum',
+                    sub_txn_type: 'N',
+                    amc_code: lumpsum_data.amc_code,
+                    amc_name: lumpsum_data.amc_name,
+                    prod_code: lumpsum_data.prod_code,
+                    prod_name: lumpsum_data.prod_name,
+                    reinv_flag: lumpsum_data.reinv_flag || 'Y',
+                    txn_amount: lumpsum_data.txn_amount
+                }
+            });
+
+            logger.debug("Add to lumpsum cart response ==> ", response.data);
+            return response.data;
+
+        } catch (error) {
+            logger.error("Error adding to lumpsum cart service ==> ", error);
+            throw new AppError("Failed to add to lumpsum cart", 500, "ADD_TO_CART_ERROR");
+        }
+    }
 
 
 
