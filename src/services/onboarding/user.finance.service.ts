@@ -28,6 +28,20 @@ class UserFinanceServiceClass {
         });
     }
 
+    async get_income_slab_code(user_id: string): Promise<string> {
+        const finance = await this.get_by_user(user_id);
+        if (!finance) return "31"; // Default to below 1L
+
+        const income = Number(finance.annual_income);
+
+        if (income < 100000) return "31";        // Below 1L
+        if (income < 500000) return "32";        // 1-5L
+        if (income < 1000000) return "33";       // 5-10L
+        if (income < 2500000) return "34";       // 10-25L
+        if (income <= 10000000) return "35";      // 25L-1Cr
+        return "36";                            // Above 1Cr
+    }
+
     async delete(user_id: string) {
         return await db.userFinance.delete({
             where: { user_id: user_id },

@@ -11,3 +11,4 @@ mututal_fund_router.get("/:id", mutual_fund_controller.get_mutual_fund_by_id);
 
 // Purchasing Mutualfunds
 mututal_fund_router.post("/lumpsum-cart", login_require, mutual_fund_controller.add_to_lumpsum_cart);
+mututal_fund_router.post("/sip-cart", login_require, mutual_fund_controller.add_to_sip_cart);

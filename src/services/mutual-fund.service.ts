@@ -3,7 +3,7 @@ import logger from "../middleware/logger.js";
 import { db } from "../server.js";
 import pLimit from "p-limit";
 import type { MfNavHistoryCreateManyInput, MfProductOrderByWithRelationInput, MfProductWhereInput } from "../prisma/generated/prisma/models.js";
-import { Lumpsum_cart_data } from "../lib/types.js";
+import { Lumpsum_cart_data, Sip_cart_data } from "../lib/types.js";
 import { env } from "../lib/config-env.js";
 import AppError from "../middleware/error.middleware.js";
 
@@ -103,11 +103,9 @@ class MututalFundServiceClass {
 
 
     // Purchasing service lumpsum and sip to finnsys cart
-
     add_lumpsum_cart = async (lumpsum_data: Lumpsum_cart_data, user_data: { log: string, pwd: string }) => {
         try {
 
-            // https://jantanivesh.com/finnsys/app/master.service.asp?log=nimit691&pwd=64119&svc=addcartlumpsum&sub_txn_type=N&amc_code=D&amc_name=Edelweiss Mutual Fund&prod_code=EDEIRD-DR&prod_name=EDELWEISS EQUITY SAVINGS FUND - REGULAR PLAN - IDCW REINVESTMENT&reinv_flag=Y&txn_amount=10000
             const response = await axios.get(`${this.finnsys_base_url}/finnsys/app/master.service.asp`, {
                 params: {
                     log: user_data.log,
@@ -129,6 +127,38 @@ class MututalFundServiceClass {
         } catch (error) {
             logger.error("Error adding to lumpsum cart service ==> ", error);
             throw new AppError("Failed to add to lumpsum cart", 500, "ADD_TO_CART_ERROR");
+        }
+    }
+
+
+    add_sip_cart = async (sip_data: Sip_cart_data, user_data: { log: string, pwd: string }) => {
+        try {
+            const response = await axios.get(`${this.finnsys_base_url}/finnsys/app/master.service.asp`, {
+                params: {
+                    log: user_data.log,
+                    pwd: user_data.pwd,
+                    svc: 'addcartsip',
+                    sub_txn_type: 'S',
+                    amc_code: sip_data.amc_code,
+                    amc_name: sip_data.amc_name,
+                    prod_code: sip_data.prod_code,
+                    prod_name: sip_data.prod_name,
+                    reinv_flag: sip_data.reinv_flag || 'Y',
+                    txn_amount: sip_data.txn_amount,
+                    sip_st_date: sip_data.sip_st_date,
+                    sip_en_date: sip_data.sip_en_date,
+                    sip_freq: sip_data.sip_freq,
+                    sip_day: sip_data.sip_day,
+                    sip_amt: sip_data.sip_amt
+                }
+            });
+
+            logger.debug("Add to sip cart response ==> ", response.data);
+            return response.data;
+
+        } catch (error) {
+            logger.error("Error adding to sip cart service ==> ", error);
+            throw new AppError("Failed to add to sip cart", 500, "ADD_TO_CART_ERROR");
         }
     }
 

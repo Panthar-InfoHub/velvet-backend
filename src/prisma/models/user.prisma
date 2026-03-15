@@ -25,11 +25,12 @@ model User {
     updatedAt DateTime @default(now()) @updatedAt
 
     // Relations
-    user_finance   UserFinance?
-    user_assets    UserAssets?
-    user_insurance UserInsurance?
-    user_loan      UserLoan[]
-    user_goals     UserGoals[]
+    user_finance      UserFinance?
+    user_assets       UserAssets?
+    user_insurance    UserInsurance?
+    user_loan         UserLoan[]
+    user_goals        UserGoals[]
+    user_bank_details UserBankDetails[]
 
     // Kyc Relations
     kyc_types       KycType[]

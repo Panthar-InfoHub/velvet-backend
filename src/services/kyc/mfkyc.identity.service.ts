@@ -40,6 +40,36 @@ class MFKycIdentityServiceClass {
         });
     }
 
+    upsert_bank_details = async (user_id: string, bank_data: {
+        account_no: string;
+        ifsc_code: string;
+        bank_name?: string;
+        account_type: string;
+        is_primary?: boolean;
+    }) => {
+        return await db.userBankDetails.upsert({
+            where: {
+                user_account_no_idx: {
+                    user_id,
+                    account_no: bank_data.account_no
+                }
+            },
+            create: {
+                user_id,
+                ...bank_data
+            },
+            update: {
+                ...bank_data
+            }
+        });
+    }
+
+    get_primary_bank = async (user_id: string) => {
+        return await db.userBankDetails.findFirst({
+            where: { user_id, is_primary: true }
+        });
+    }
+
 
     get_verified_details = async (user_id: string, pan_no: string) => {
         try {

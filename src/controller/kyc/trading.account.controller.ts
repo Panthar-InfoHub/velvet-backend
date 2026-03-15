@@ -28,7 +28,17 @@ class TradingAccountControllerClass {
 
             logger.debug("Trading account mandatory data is validated...")
 
-            const data = await trading_account_service.client_registration(result.data);
+            // Store bank details if provided in current registration flow
+            if (result.data.account_no_1 && result.data.ifsc_code_1) {
+                await mfkyc_identity_service.upsert_bank_details(req.user!.id, {
+                    account_no: result.data.account_no_1,
+                    ifsc_code: result.data.ifsc_code_1,
+                    account_type: result.data.account_type_1 || "SB",
+                    is_primary: result.data.default_bank_flag_1 === "Y"
+                });
+            }
+
+            const data = await trading_account_service.client_registration(req.user!.id, result.data);
             await user_service.update_user(req.user!.id, { nse_client_code: raw_payload.client_code });
             logger.info("Trading account created successfully for user id ==> ", req.user?.id, " with client code ==> ", raw_payload.client_code);
 

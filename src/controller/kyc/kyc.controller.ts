@@ -222,7 +222,7 @@ class KycControllerClass {
             const digilocker_data = await kyc_finnsys_service.user_digilocker_data(
                 user_kyc_session?.mfKycSessions?.merchant_id!,
                 user_kyc_session?.mfKycSessions?.kyc_access_token!,
-                inv_id
+                inv_id.toString()
             );
 
             logger.debug("Digilocker data response: ", digilocker_data);
@@ -233,9 +233,9 @@ class KycControllerClass {
 
             // hit finnsys POI, POA and Corr Address update APIs in sequence 
             const address_data = this.extract_poi_data(user_mf_kyc_identity);
-            const poi_res = await kyc_finnsys_service.update_poi(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
-            const poa_res = await kyc_finnsys_service.update_poa(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
-            const corr_res = await kyc_finnsys_service.update_corr_poa_address(user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, user_id);
+            const poi_res = await kyc_finnsys_service.update_poi(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, inv_id.toString());
+            const poa_res = await kyc_finnsys_service.update_poa(address_data, user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, inv_id.toString());
+            const corr_res = await kyc_finnsys_service.update_corr_poa_address(user_kyc_session?.mfKycSessions?.kyc_access_token!, user_kyc_session?.mfKycSessions?.merchant_id!, inv_id.toString());
 
 
             logger.debug(` Poi res ==> `, poi_res)
@@ -248,8 +248,8 @@ class KycControllerClass {
                 data: user_mf_kyc_identity
             });
             return;
-        } catch (error) {
-            logger.error("Error fetching digilocker data: ", error);
+        } catch (error: any) {
+            logger.error("Error fetching digilocker data: ", error.response.data);
             next(error);
             return;
         }

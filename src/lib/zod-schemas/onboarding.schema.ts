@@ -6,6 +6,8 @@ const onboarding_profile_schema = z.object({
     full_name: z.string().min(1).optional(),
     city: z.string().min(1).optional(),
     dob: z.coerce.date().optional(),
+    email: z.string().email().optional(),
+    phone: z.string().min(10).max(15).optional(),
 });
 
 const onboarding_finance_schema = z.object({

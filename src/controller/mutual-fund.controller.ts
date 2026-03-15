@@ -6,7 +6,7 @@ import { mututal_funds_service } from "../services/mutual-fund.service.js";
 import { redis, redis_buffer_client } from "../lib/redis.js";
 import { decompressAndFilter, get_mf_search_query } from "../lib/utils.js";
 import AppError from "../middleware/error.middleware.js";
-import { lumpsum_cart_zod_schema } from "../lib/types.js";
+import { lumpsum_cart_zod_schema, sip_cart_zod_schema } from "../lib/types.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -182,6 +182,77 @@ class MutualFundControllerClass {
 
         } catch (error) {
             logger.error("Error in add_to_lumpsum_cart controller ==> ", error);
+            next(error);
+            return;
+        }
+    }
+
+
+    add_to_sip_cart = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const user = req.user;
+            logger.info(`Adding to sip cart for user: ${user?.id}`);
+
+            const { amount, mf_product_id, sip_st_date, sip_en_date, sip_freq, sip_day, sip_amt } = req.body;
+            if (!amount || !mf_product_id || !sip_st_date || !sip_en_date || !sip_freq || !sip_day || !sip_amt) {
+                logger.warn("Missing required fields in add_to_sip_cart request body");
+                throw new AppError("Missing required fields: amount and mf_product_id are required", 400);
+            }
+
+            const mf_product = await mututal_funds_service.get_mutual_fund_by_id(mf_product_id);
+
+
+            if (!mf_product?.transaction_rules?.sip_allowed_dates.includes(sip_day)) {
+                logger.warn("SIP day is not allowed for this mutual fund");
+                throw new AppError(`SIP day ${sip_day} is not allowed for this mutual fund`, 400);
+            }
+
+            if (!mf_product?.transaction_rules?.sip_frequencies.includes(sip_freq)) {
+                logger.warn(`SIP frequency ${sip_freq} is not allowed for this mutual fund`);
+                throw new AppError(`SIP with ${sip_freq} frequency is not allowed for this mutual fund`, 400);
+            }
+
+            const sip_data_validation = sip_cart_zod_schema.safeParse({
+                amc_code: mf_product?.amc_code || "",
+                amc_name: mf_product?.amc_name || "",
+                prod_code: mf_product?.platform_code || "",
+                prod_name: mf_product?.scheme_name || "",
+                txn_amount: amount,
+                sip_st_date: sip_st_date,
+                sip_en_date: sip_en_date,
+                sip_freq: sip_freq,
+                sip_day: sip_day,
+                sip_amt: sip_amt
+            });
+
+            if (!sip_data_validation.success) {
+                logger.warn("Validation failed for add_to_sip_cart request body", { errors: sip_data_validation.error.issues });
+                throw new AppError("Validation failed for SIP cart data", 400, "VALIDATION_ERROR", sip_data_validation.error);
+            }
+
+            const result = await mututal_funds_service.add_sip_cart(sip_data_validation.data, {
+                log: user?.log as string,
+                pwd: user?.pwd as string
+            });
+
+            logger.debug("Result from add_to_sip_cart service ==> ", result);
+
+            if (result.code != "1") {
+                logger.error("Failed to add to sip cart, service response code: ", result.code);
+                throw new AppError("Failed to add to sip cart", 500, "ADD_TO_CART_SIP_ERROR");
+            }
+
+            res.status(200).json({
+                success: true,
+                message: "Added to sip cart successfully",
+                data: result
+            });
+            return;
+
+
+        } catch (error) {
+            logger.error("Error in add_to_sip_cart controller ==> ", error);
             next(error);
             return;
         }

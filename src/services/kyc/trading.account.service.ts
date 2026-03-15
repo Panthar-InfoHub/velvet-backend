@@ -1,7 +1,7 @@
 import axios from "axios";
-import { env } from "../../lib/config-env.js";
-import { NSEServiceClass } from "../nse.service.js";
 import logger from "../../middleware/logger.js";
+import { NSEServiceClass } from "../nse.service.js";
+import { user_finance_service } from "../onboarding/user.finance.service.js";
 
 class TradingAccountServiceClass extends NSEServiceClass {
     // kyc_base_url: string;
@@ -13,7 +13,7 @@ class TradingAccountServiceClass extends NSEServiceClass {
 
 
     // Implement trading account related methods here
-    client_registration = async (data: any) => {
+    client_registration = async (user_id: string, data: any) => {
 
         const headers = this.get_nse_headers();
 
@@ -32,23 +32,21 @@ class TradingAccountServiceClass extends NSEServiceClass {
 
 
         // If data tax_status === 01 (Individual), need to call fatca registration API as well. This is mandatory for individual clients.
-        if (data.tax_status === "01") {
-            logger.debug("Client is individual, proceeding with FATCA registration...");
-            // Call fatca registration API
-            const fatca_data = this.extract_fatca_data(data);
-            const response = await axios.post(`${this.kyc_base_url}/nse/v2/registration/fatca-registration`, {
-                data: {
-                    reg_details: [fatca_data]
-                }
-            }, {
-                headers: {
-                    ...headers,
-                    "Content-Type": "application/json"
-                }
-            });
+        logger.debug("Client is individual, proceeding with FATCA registration...");
+        // Call fatca registration API
+        const fatca_data = await this.extract_fatca_data(user_id, data);
+        const fatca_res = await axios.post(`${this.kyc_base_url}/nse/v2/registration/fatca-registration`, {
+            data: {
+                reg_details: [fatca_data]
+            }
+        }, {
+            headers: {
+                ...headers,
+                "Content-Type": "application/json"
+            }
+        });
 
-            logger.debug("FATCA registration response from NSE API ==> ", response.data);
-        }
+        logger.debug("FATCA registration response from NSE API ==> ", fatca_res.data);
 
         return response.data;
     }
@@ -57,10 +55,9 @@ class TradingAccountServiceClass extends NSEServiceClass {
 
 
 
+    private async extract_fatca_data(user_id: string, user_input: any) {
+        const income_slab = await user_finance_service.get_income_slab_code(user_id);
 
-
-
-    private extract_fatca_data(user_input: any) {
         return {
             // --- 1. PREFILLED DATA (Mapped from input) ---
             pan_rp: user_input.pan_rp || "",
@@ -72,11 +69,11 @@ class TradingAccountServiceClass extends NSEServiceClass {
 
             // --- 2. USER INPUTS (Requested from UI) ---
             addr_type: user_input.addr_type || "1",
-            po_bir_inc: user_input.po_bir_inc || "",
-            srce_wealt: user_input.srce_wealt || "",
-            inc_slab: user_input.inc_slab || "",
-            occ_code: user_input.occ_code || "",
-            occ_type: user_input.occ_type || "",
+            po_bir_inc: user_input.po_bir_inc || "", // Place of birth for individual clients, country of incorporation for non-individual clients
+            srce_wealt: user_input.srce_wealt || "", // 01 : Salary | 02 : Business Income | 03 : Gift | 04 : Ancestral Property | 05 : Rental Income | 06 : Prize Money | 07 : Royalty | 08 : Other
+            inc_slab: income_slab, // Auto-calculated from user_finance
+            occ_code: user_input.occ_code || "", // store from user kyc process | TODO : user model should have occupation code field to store this data | Don't ask user
+            occ_type: user_input.occ_type || "", // S - Service; B - Business, O - Others; X - Not Categorized
             pep_flag: user_input.pep_flag || "N",
 
             // --- 3. SYSTEM CONSTANTS (Do not change) ---

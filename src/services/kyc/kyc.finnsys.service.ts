@@ -76,9 +76,13 @@ class KycFinnsysServiceClass {
             type,
             data
         };
+
+        logger.debug("Payload for updating form data ==> ", payload);
         const response = await axios.post(`${this.kyc_base_url}/onboardings/updateForm`, payload, {
             headers: { "Authorization": `${kyc_access_token}` }
         });
+
+        logger.warn(`Response from updating ${type} form data ==> `, response.data);
         return response.data;
     }
 
@@ -102,9 +106,10 @@ class KycFinnsysServiceClass {
                 type: "aadhaarDigiLocker",
                 ...poa_data
             });
-        } catch (error) {
-            logger.error("Error in updating POA data ==> ", error);
-            throw error;
+        } catch (error: any) {
+            console.log("Error in updating POA data ==> ", error?.response);
+        // logger.error("Error in updating POA data ==> ", error?.response);
+        // throw error;
         }
     }
 

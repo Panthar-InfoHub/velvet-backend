@@ -2,7 +2,7 @@
 .agents/
 node_modules/
 dist/
-tests/
+extras/
 plans/
 /src/prisma/generated/
 
