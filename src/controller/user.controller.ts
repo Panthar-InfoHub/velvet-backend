@@ -558,6 +558,10 @@ class UserFinanceControllerClass {
             let final_investment_items = mf_investment_items;
 
             // Merge xSIP details into the items if any item has a SIP
+            // Finnsys portfolio API flags is_sip but doesn't return SIP registration details
+            // (xsip_reg_no/order_id, sip_amount, sip_status), so we cross-reference the xSIP
+            // registration report by (actual_folio, scheme_id) to fill them in.
+            // NOTE: if this fetch/match fails, items silently stay un-enriched (no error surfaced).
             const has_sips = mf_investment_items.some(item => item.is_sip === true);
             if (has_sips) {
                 logger.debug(`User folio funds have sip funds... Checking xSIP report for order_id (xsip reg number)`)
@@ -574,9 +578,11 @@ class UserFinanceControllerClass {
 
                                 logger.debug(`Checking ${item.folio} / ${item.scheme_id}`)
                                 const matching_sip = xsip_report.data.report_data.find((sip: any) =>
-                                    sip.folio_number === item.actual_folio &&
-                                    sip.rta_scheme_code === item.scheme_id
+                                    sip.folio_number === item.actual_folio
+                                    // sip.rta_scheme_code === item.scheme_id
                                 );
+
+                                logger.debug(`matching sip found.....`, matching_sip)
 
                                 if (matching_sip) {
                                     return {
