@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { redis } from "../lib/redis.js";
-import { sip_cart_zod_schema, redeem_request_zod_schema, invest_more_zod_schema, purchase_sip_body_schema, Sip_purchase_item } from "../lib/types.js";
+import { sip_cart_zod_schema, redeem_request_zod_schema, invest_more_zod_schema, purchase_sip_body_schema, Sip_purchase_item, notification_type } from "../lib/types.js";
 import { db } from "../server.js";
 import { add_bundle_to_cart_schema } from "../lib/zod-schemas/bundle.schema.js";
 import { get_mf_search_query } from "../lib/utils.js";
@@ -12,6 +12,7 @@ import { zoho_webhook_service } from "../services/zoho.webhook.service.js";
 import { user_service } from "../services/user.service.js";
 import { MfOrderService } from "../services/mutual-funds/MfOrderService.js";
 import { MfCartService } from "../services/mutual-funds/MfCartService.js";
+import { notification_producer_service } from "../services/notification.producer.service.js";
 
 
 
@@ -28,7 +29,7 @@ class MutualFundControllerClass {
 
             // Direct category fetch
             const fund_category = req.query.fund_category as string;
-            const direct_categories = ['flexi_cap', 'large_Mid_cap', 'large_cap', 'mid_cap', 'small_cap', 'index', 'global_others'];
+            const direct_categories = ['flexi_cap', 'large_Mid_cap', 'large_cap', 'mid_cap', 'small_cap', 'index', 'global_others', 'gold', 'silver'];
 
             if (fund_category && direct_categories.includes(fund_category)) {
                 logger.info(`Fetching mutual funds by fund_category: ${fund_category} - Page: ${page}, Limit: ${limit}`);
@@ -216,6 +217,17 @@ class MutualFundControllerClass {
 
             // Invalidate Finnsys portfolio cache
             await redis.del(`mf_portfolio:finnsys:${user.id}`);
+
+            await notification_producer_service.publish_notification_event(
+                user.id,
+                "TRANSACTION",
+                "Lumpsum purchase initiated",
+                `Your lumpsum purchase has been initiated`,
+                {
+                    txn: "mf",
+                    sub_type: notification_type.FUND_INC
+                }
+            );
 
             res.status(200).json({
                 success: true,
@@ -455,6 +467,17 @@ class MutualFundControllerClass {
             // Invalidate Finnsys portfolio cache
             await redis.del(`mf_portfolio:finnsys:${user.id}`);
 
+            await notification_producer_service.publish_notification_event(
+                user.id,
+                "TRANSACTION",
+                "SIP Purchase Initiated",
+                `Your SIP purchase has been initiated`,
+                {
+                    txn: "mf",
+                    sub_type: notification_type.FUND_INC
+                }
+            );
+
             res.status(200).json({
                 success: true,
                 message: "xSIP orders created successfully. Please complete payment to execute.",
@@ -487,6 +510,17 @@ class MutualFundControllerClass {
             }
 
             const result = await mutual_funds_service.order.execute_redemption(user.id, validation.data, user.log!, user.pwd!);
+
+            await notification_producer_service.publish_notification_event(
+                user.id,
+                "TRANSACTION",
+                "Redeem Order Submitted",
+                `Your redeem order has been submitted`,
+                {
+                    txn: "mf",
+                    sub_type: notification_type.NOTIFICATION
+                }
+            );
 
             res.status(200).json({
                 success: true,
@@ -541,6 +575,7 @@ class MutualFundControllerClass {
             const user = req.user!;
             logger.info(`Adding bundle to cart for user: ${user.id}`);
 
+            logger.debug(`Req body for bundle ==> `, req.body)
             const validation = add_bundle_to_cart_schema.safeParse(req.body);
             if (!validation.success) {
                 logger.warn("Validation failed for add_bundle_to_cart request body", { errors: validation.error.issues });
