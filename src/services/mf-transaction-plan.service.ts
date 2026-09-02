@@ -148,6 +148,77 @@ class MfTransactionPlanServiceClass {
         });
     }
 
+    sync_switch_plan_from_webhook = async (switch_plan: any) => {
+        const fp_id = switch_plan?.id;
+
+        if (!fp_id) {
+            throw new AppError(
+                "MF switch plan webhook is missing switch plan id",
+                400,
+                "MF_SWITCH_PLAN_WEBHOOK_ID_MISSING",
+            );
+        }
+
+        const existing = await db.mfTransactionPlan.findUnique({
+            where: { fp_id },
+            select: {
+                user_id: true,
+                plan_type: true,
+                systematic: true,
+            },
+        });
+
+        if (!existing) {
+            logger.warn(
+                "MF switch plan webhook received for unknown FP id",
+                { fp_id },
+            );
+
+            throw new AppError(
+                "MF transaction not found for webhook switch plan",
+                404,
+                "MF_SWITCH_PLAN_WEBHOOK_TRANSACTION_NOT_FOUND",
+            );
+        }
+
+        if (existing.plan_type !== "SWITCH") {
+            logger.error(
+                "MF switch plan webhook matched non-switch transaction",
+                {
+                    fp_id,
+                    plan_type: existing.plan_type,
+                },
+            );
+
+            throw new AppError(
+                "Webhook switch plan does not match a switch transaction",
+                409,
+                "MF_SWITCH_PLAN_WEBHOOK_PLAN_TYPE_MISMATCH",
+            );
+        }
+
+        if (!existing.systematic) {
+            logger.error(
+                "MF switch plan webhook matched non-systematic transaction",
+                {
+                    fp_id,
+                },
+            );
+
+            throw new AppError(
+                "Webhook switch plan does not match a systematic switch plan",
+                409,
+                "MF_SWITCH_PLAN_WEBHOOK_SYSTEMATIC_MISMATCH",
+            );
+        }
+
+        return await this.upsert_from_fp(
+            existing.user_id,
+            "SWITCH",
+            switch_plan,
+            true,
+        );
+    };
     /** Records that our own OTP gate was passed and consent was sent to FP - not the OTP value itself. */
     mark_consent_given = async (id: string) => {
         return await db.mfTransactionPlan.update({ where: { id }, data: { consent_given_at: new Date() } });
