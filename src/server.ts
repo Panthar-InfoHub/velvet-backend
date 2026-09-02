@@ -42,7 +42,7 @@ import { migration_router } from "./routes/migration.router.js"
 import { report_router } from "./routes/report.router.js"
 import { extendPrismaClient } from "./lib/extended-db.js"
 import { test_router } from "./routes/test.router.js"
-
+import { mf_redemption_plan_webhook_router } from "./routes/webhooks/mf_redemption_plan.webhook.router.js";
 
 //Configurations
 dotenv.config()
@@ -79,6 +79,7 @@ app.use("/api/v2/onboarding/nominee", nominee_router)
 app.use("/api/v2/mandate", mandate_router)
 app.use("/api/v2/webhook/mandate", mandate_webhook_router)
 app.use("/api/v2/webhook/fp", fp_webhook_router)
+app.use("/api/v2/webhook/mf-redemption-plan", mf_redemption_plan_webhook_router);
 app.use("/api/v2/mf-scheme", mf_scheme_router)
 
 
