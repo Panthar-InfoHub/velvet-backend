@@ -53,6 +53,7 @@ const FETCHERS: Record<string, (fp_id: string) => Promise<any>> = {
     mf_purchase_plan: (id) => fintech_primitive_mf_purchase_plan_service.get_purchase_plan(id),
     mf_redemption: (id) => fintech_primitive_mf_redemption_service.get_redemption(id),
     mf_redemption_plan: (id) => fintech_primitive_mf_redemption_plan_service.get_redemption_plan(id),
+    mf_switch: (id) => fintech_primitive_mf_switch_plan_service.get_switch_plan(id),
     mf_switch_plan: (id) => fintech_primitive_mf_switch_plan_service.get_switch_plan(id),
 };
 
