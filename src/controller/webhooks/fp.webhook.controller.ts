@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import logger from "../../middleware/logger.js";
 import { fp_webhook_event_service } from "../../services/webhooks/fp-webhook-event.service.js";
-
+import { mf_transaction_plan_service } from "../../services/mf-transaction-plan.service.js";
 /**
  * Single entry point for every FP notification webhook.
  *
@@ -73,7 +73,11 @@ export const handleFpWebhook = async (
             object_type,
             state: trusted_object?.state,
         });
-
+        if (object_type === "mf_switch_plan") {
+            await mf_transaction_plan_service.sync_switch_plan_from_webhook(
+                trusted_object,
+            );
+        }
         // WHK-1..WHK-6: dispatch on `object_type` and persist `trusted_object` via
         // mf_transaction_plan_service.upsert_from_fp. Intentionally a no-op in WHK-0 - this
         // ticket is the shared plumbing, the per-resource handlers are their own tickets.
