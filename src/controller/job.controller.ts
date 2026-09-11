@@ -4,6 +4,7 @@ import { env } from "../lib/config-env.js";
 import AppError from "../middleware/error.middleware.js";
 import logger from "../middleware/logger.js";
 import { job_service } from "../services/job.service.js";
+import { db } from "../server.js";
 
 class JobControllerClass {
 
@@ -231,6 +232,39 @@ class JobControllerClass {
             return;
         }
     };
+
+
+
+    send_daily_fd_rates = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const startOfDay = new Date();
+            startOfDay.setUTCHours(0, 0, 0, 0);
+
+            // Senior Engineer Note on Timezones: 
+            // If your GCP servers run in UTC, `setUTCHours` means "today" starts at 5:30 AM IST. 
+            // If you need "today" to strictly mean midnight IST, you must offset this!
+
+            // 2. Fetch the rates updated from the start of the day until now
+            const todayRates = await db.fdInterestRate.findMany({
+                where: {
+                    updatedAt: {
+                        gte: startOfDay,
+                    },
+                },
+            });
+
+            // 3. Send the data straight back to Janta in the HTTP response
+            return res.status(200).json({
+                success: true,
+                count: todayRates.length,
+                rates: todayRates
+            });
+        } catch (error) {
+            logger.error(`Error fetching and sending fd rates ==> `, error)
+            next(error);
+            return
+        }
+    }
 }
 
 export const job_controller = new JobControllerClass();
