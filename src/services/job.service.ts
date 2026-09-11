@@ -303,13 +303,43 @@ class JobServiceClass {
                                     // Unique constraint: (fd_product_id, payout_frequency, tenure_label, customer_type)
                                     const uniqueKey = `${pId}|${mappedFreq}|${tenureLabel}|${customerType}`;
 
+                                    let tenureDays = parseInt(tm.tenure || '0', 10);
+                                    if (isNaN(tenureDays)) tenureDays = 0;
+
+                                    const lowerLabel = tenureLabel.toLowerCase();
+                                    const monthMatch = lowerLabel.match(/^(\d+)\s*month/);
+                                    const yearMatch = lowerLabel.match(/^(\d+)\s*year/);
+
+                                    const monthToDaysMap: Record<number, number> = {
+                                        12: 365,
+                                        18: 548,
+                                        24: 730,
+                                        31: 943,
+                                        36: 1095,
+                                        42: 1278,
+                                        48: 1461,
+                                        50: 1521,
+                                        60: 1826,
+                                    };
+
+                                    // Normalize tenure_days when Blostem sends tenure in months/years instead of days
+                                    if (monthMatch && (tenureDays <= 60 || tenureDays === parseInt(monthMatch[1], 10))) {
+                                        const months = parseInt(monthMatch[1], 10);
+                                        tenureDays = monthToDaysMap[months] || Math.round(months * (365 / 12));
+                                    } else if (yearMatch && tenureDays <= 10) {
+                                        const years = parseInt(yearMatch[1], 10);
+                                        tenureDays = Math.round(years * 365);
+                                    } else if (lowerLabel.includes('month') && tenureDays <= 60 && tenureDays > 0) {
+                                        tenureDays = monthToDaysMap[tenureDays] || Math.round(tenureDays * (365 / 12));
+                                    }
+
                                     if (seenUniqueKeys.has(uniqueKey)) {
                                         duplicatesSkipped++;
                                     } else {
                                         seenUniqueKeys.add(uniqueKey);
                                         rateValues.push(Prisma.sql`(
                                         ${cuid()}, ${pId}, ${mappedFreq}::"FdPayoutFrequency", ${customerType}::"FdCustomerType", 
-                                        ${tm.tenure}, ${tenureLabel}, ${parseFloat(tm.rates.replace('%', ''))}, 
+                                        ${tenureDays}, ${tenureLabel}, ${parseFloat(tm.rates.replace('%', ''))}, 
                                         ${parseFloat(tm.annualizedYield?.replace('%', '') || '0')},
                                         ${tm.default === true}, null, NOW()
                                     )`);
