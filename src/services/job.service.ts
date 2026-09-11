@@ -299,8 +299,9 @@ class JobServiceClass {
                                 }
 
                                 freqGroup.tenure_mapping?.forEach((tm: any) => {
-                                    // Unique constraint: (fd_product_id, payout_frequency, tenure_days, customer_type)
-                                    const uniqueKey = `${pId}|${mappedFreq}|${tm.tenure}|${customerType}`;
+                                    const tenureLabel = (tm.year || tm.display || `${tm.tenure} Days`).trim();
+                                    // Unique constraint: (fd_product_id, payout_frequency, tenure_label, customer_type)
+                                    const uniqueKey = `${pId}|${mappedFreq}|${tenureLabel}|${customerType}`;
 
                                     if (seenUniqueKeys.has(uniqueKey)) {
                                         duplicatesSkipped++;
@@ -308,7 +309,7 @@ class JobServiceClass {
                                         seenUniqueKeys.add(uniqueKey);
                                         rateValues.push(Prisma.sql`(
                                         ${cuid()}, ${pId}, ${mappedFreq}::"FdPayoutFrequency", ${customerType}::"FdCustomerType", 
-                                        ${tm.tenure}, ${tm.year || tm.display}, ${parseFloat(tm.rates.replace('%', ''))}, 
+                                        ${tm.tenure}, ${tenureLabel}, ${parseFloat(tm.rates.replace('%', ''))}, 
                                         ${parseFloat(tm.annualizedYield?.replace('%', '') || '0')},
                                         ${tm.default === true}, null, NOW()
                                     )`);
@@ -330,8 +331,10 @@ class JobServiceClass {
                             VALUES ${Prisma.join(rateValues)}
                             ON CONFLICT (fd_product_id, payout_frequency, tenure_label, customer_type) 
                             DO UPDATE SET 
+                                tenure_days = EXCLUDED.tenure_days,
                                 interest_rate = EXCLUDED.interest_rate,
                                 annualized_yield = EXCLUDED.annualized_yield, 
+                                is_default_selection = EXCLUDED.is_default_selection,
                                 "updatedAt" = NOW();
                         `;
                             logger.debug(`[FD SYNC] STEP D: Interest rate upsert completed successfully`);
