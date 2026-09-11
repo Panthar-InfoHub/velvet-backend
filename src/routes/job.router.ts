@@ -9,3 +9,5 @@ job_router.post("/mf-metrics-calc", job_controller.mf_metrics_calc_job);
 job_router.post("/fd-daily", job_controller.daily_fd_product_sync_job);
 job_router.post("/mf-single-nav/:id", job_controller.mf_single_nav_history_job);
 job_router.post("/user-snapshot", job_controller.monthly_user_snapshot_job);
+
+job_router.post("/send-daily-fd-rates", job_controller.send_daily_fd_rates);
