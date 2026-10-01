@@ -28,13 +28,16 @@ import { mf_scheme_router } from "./routes/mf-scheme.router.js"
 // mutual_fund_router (v1 Finnsys catalogue) retired as part of the Cybrilla/FP migration - the
 // controller/router and their dedicated services are excluded from the build (tsconfig.json).
 // import { mutual_fund_router } from "./routes/mutual-fund.router.js"
-import { onboarding_router } from "./routes/onboarding.router.js"
 import { user_assets_router } from "./routes/user/user.assets.router.js"
 import { user_finance_router } from "./routes/user/user.finance.router.js"
 import { user_goal_router } from "./routes/user/user.goal.router.js"
 import { user_insurance_router } from "./routes/user/user.insurance.router.js"
 import { user_loan_router } from "./routes/user/user.loan.router.js"
 import { user_router } from "./routes/user/user.router.js"
+import { finance_router } from "./routes/onboarding_routers/finance.router.js";
+import { assets_router } from "./routes/onboarding_routers/assets.router.js";
+import { loans_router } from "./routes/onboarding_routers/loans.router.js";
+import { insurance_router } from "./routes/onboarding_routers/insurance.router.js";
 import { fd_router } from "./routes/fd.router.js"
 import { webhook_router as fd_webhook_router } from "./routes/webhook.validation.router.js"
 import { bundle_router } from "./routes/bundle.router.js"
@@ -107,11 +110,14 @@ app.use("/api/v1/fd", fd_router)
 app.use("/api/v1/test", test_router)
 app.use("/api/v1/fd/webhook", fd_webhook_router)
 // app.use("/api/v1/mf", mutual_fund_router) // retired - see the import comment above
-app.use("/api/v1/onboarding", onboarding_router)
 app.use("/api/v1/user-assets", user_assets_router)
 app.use("/api/v1/user-finance", user_finance_router)
 app.use("/api/v1/user-loan", user_loan_router)
 app.use("/api/v1/user-insurance", user_insurance_router)
+app.use("/api/v2/onboarding/finance", finance_router);
+app.use("/api/v2/onboarding/assets", assets_router);
+app.use("/api/v2/onboarding/loans", loans_router);
+app.use("/api/v2/onboarding/insurance", insurance_router);
 app.use("/api/v1/user-goal", user_goal_router)
 app.use("/api/v1/fire-report", fire_report_router)
 app.use("/api/v1/report", report_router)
