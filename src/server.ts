@@ -113,7 +113,7 @@ app.use("/api/v1/user-finance", user_finance_router)
 app.use("/api/v1/user-loan", user_loan_router)
 app.use("/api/v1/user-insurance", user_insurance_router)
 app.use("/api/v1/user-goal", user_goal_router)
-app.use("/api/v1/fire-report", fire_report_router)
+app.use("/api/v2/fire-report", fire_report_router)
 app.use("/api/v1/report", report_router)
 
 app.use("/api/v1/kyc", kyc_router)
