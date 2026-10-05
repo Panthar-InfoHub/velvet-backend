@@ -41,6 +41,7 @@ import { insurance_router } from "./routes/onboarding_routers/insurance.router.j
 import { fd_router } from "./routes/fd.router.js"
 import { webhook_router as fd_webhook_router } from "./routes/webhook.validation.router.js"
 import { bundle_router } from "./routes/bundle.router.js"
+import { payment_router } from "./routes/payment.router.js"
 import { frontend_router } from "./routes/frontend.router.js"
 import { migration_router } from "./routes/migration.router.js"
 import { report_router } from "./routes/report.router.js"
@@ -92,6 +93,7 @@ app.use("/api/v2/user", user_router)
 app.use("/api/v2/user-goal", user_goal_router)
 app.use("/api/v2/report", report_router)
 app.use("/api/v2/bundles", bundle_router)
+app.use("/api/v2/payment", payment_router)
 
 
 // Admin/internal-ops routes. Mounted unconditionally - each route decides its own restriction

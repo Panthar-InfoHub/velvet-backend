@@ -22,6 +22,9 @@ type BatchPurchasePlanItem = {
     number_of_installments: number;
     payment_method: "mandate";
     payment_source: string;
+    gateway?: string;
+    initiated_by?: string;
+    initiated_via?: string;
     user_ip: string;
 };
 
@@ -44,22 +47,27 @@ class FintechPrimitiveMfPurchasePlanServiceClass {
         };
     }
 
-    /** POST /v2/mf_purchase_plans - 1-year plan (12 installments), mandate-funded, ondc gateway. */
+    /** POST /v2/mf_purchase_plans - mandate-funded, ondc gateway. */
     create_purchase_plan = async (
         input: ResolvedMfPurchasePlanInput,
         mf_investment_account: string,
         mandate_id: string,
-        user_ip: string
+        user_ip: string,
+        number_of_installments?: number,
     ) => {
+        const is_daily = input.frequency === "daily";
+        const installments =
+            number_of_installments ?? (is_daily ? 60 : NUMBER_OF_INSTALLMENTS);
+
         const payload = {
             mf_investment_account,
             scheme: input.scheme,
             frequency: input.frequency,
             amount: input.amount,
-            installment_day: input.installment_day ?? null, // must be null for frequency = daily
+            installment_day: is_daily ? null : (input.installment_day ?? null), // must be null for frequency = daily
             folio_number: input.folio_number,
             purpose: input.purpose,
-            number_of_installments: NUMBER_OF_INSTALLMENTS,
+            number_of_installments: installments,
             systematic: true,
             payment_method: "mandate",
             payment_source: mandate_id,
@@ -123,13 +131,16 @@ class FintechPrimitiveMfPurchasePlanServiceClass {
 
             return response.data;
         } catch (error: any) {
+            const fp_err = error?.response?.data;
             logger.error(
                 "Error creating FP mf_purchase_plan batch ==> ",
-                error?.response?.data || error.message,
+                fp_err || error.message,
             );
 
+            const detail = JSON.stringify(fp_err?.error?.errors || fp_err || error.message);
+
             throw new AppError(
-                "Failed to create MF purchase plan batch",
+                `Failed to create MF purchase plan batch: ${detail}`,
                 502,
                 "MF_BATCH_PLAN_CREATE_FAILED",
             );
@@ -158,13 +169,77 @@ class FintechPrimitiveMfPurchasePlanServiceClass {
             logger.debug("FP mf_purchase_plan confirm response ==> ", response.data);
             return response.data;
         } catch (error: any) {
-            logger.error("Error confirming FP mf_purchase_plan ==> ", error?.response?.data || error.message);
-            throw new AppError("Failed to confirm MF purchase plan", 502, "MF_PURCHASE_PLAN_CONFIRM_FAILED");
+            const fp_err = error?.response?.data;
+            logger.error("Error confirming FP mf_purchase_plan ==> ", fp_err || error.message);
+            const detail = fp_err?.error?.message || fp_err?.message || (typeof fp_err === "object" ? JSON.stringify(fp_err) : fp_err) || error.message;
+            throw new AppError(`Failed to confirm MF purchase plan: ${detail}`, 502, "MF_PURCHASE_PLAN_CONFIRM_FAILED");
         }
     }
 
     /** Alias for confirm_purchase_plan for semantic compatibility across callers */
     update_purchase_plan = this.confirm_purchase_plan;
+
+    /**
+     * PATCH /v2/mf_purchase_plans/batch - updates batch purchase plans to confirmed state with consent.
+     */
+    update_batch_purchase_plans = async (
+        plans: Array<{
+            id: string;
+            state: "confirmed";
+            consent: { email: string; isd_code: string; mobile: string };
+        }>,
+    ) => {
+        if (plans.length === 0) {
+            throw new AppError(
+                "No purchase plans provided to update",
+                400,
+                "MF_BATCH_PLANS_EMPTY",
+            );
+        }
+
+        const payload = {
+            mf_purchase_plans: plans,
+        };
+
+        logger.debug("Updating FP batch mf_purchase_plans", { payload });
+
+        try {
+            const response = await axios.patch(
+                `${this.base_url}/v2/mf_purchase_plans/batch`,
+                payload,
+                {
+                    headers: await this.auth_headers({
+                        "Content-Type": "application/json",
+                    }),
+                },
+            );
+
+            logger.debug(
+                "FP mf_purchase_plan batch update response ==> ",
+                response.data,
+            );
+
+            return response.data;
+        } catch (error: any) {
+            const fp_err = error?.response?.data;
+            logger.error(
+                "Error updating FP mf_purchase_plan batch ==> ",
+                fp_err || error.message,
+            );
+
+            const detail =
+                fp_err?.error?.message ||
+                fp_err?.message ||
+                (typeof fp_err === "object" ? JSON.stringify(fp_err) : fp_err) ||
+                error.message;
+
+            throw new AppError(
+                `Failed to confirm MF purchase plan batch: ${detail}`,
+                502,
+                "MF_BATCH_PLAN_CONFIRM_FAILED",
+            );
+        }
+    };
 
     /** GET /v2/mf_purchase_plans/:id */
     get_purchase_plan = async (fp_purchase_plan_id: string) => {
