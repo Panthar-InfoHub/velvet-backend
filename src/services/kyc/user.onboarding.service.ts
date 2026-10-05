@@ -41,32 +41,53 @@ class UserOnboardingServiceClass {
         const onboarding = await this.get_or_create(user_id);
 
         // Backward-compatible reverse penny check:
-        // For existing users who already passed Penny Drop or completed onboarding, PENDING won't block them.
-        // For users going through the flow, reverse_penny_status must be VERIFIED.
+        // Existing users who already passed Penny Drop can have
+        // reverse_penny_status as PENDING.
         const is_reverse_penny_satisfied =
             onboarding.reverse_penny_status === "VERIFIED" ||
-            (onboarding.penny_drop_status === "VERIFIED" && onboarding.reverse_penny_status === "PENDING");
+            (onboarding.penny_drop_status === "VERIFIED" &&
+                onboarding.reverse_penny_status === "PENDING");
 
         const is_done =
-            onboarding.basic_details_status === "VERIFIED" && // strict - mandatory stage, no skip path exists
-            onboarding.readiness_status === "VERIFIED" && // strict - SKIPPED here means "deferred the whole flow", never completable
+            // Mandatory compliance stages
+            onboarding.basic_details_status === "VERIFIED" &&
+            onboarding.readiness_status === "VERIFIED" &&
             ["VERIFIED", "SKIPPED"].includes(onboarding.kyc_status) &&
             is_reverse_penny_satisfied &&
             onboarding.penny_drop_status === "VERIFIED" &&
-            onboarding.email_status === "VERIFIED" && // strict - email OTP is never skippable
+            onboarding.email_status === "VERIFIED" &&
             onboarding.profile_status === "VERIFIED" &&
-            ["VERIFIED", "SKIPPED"].includes(onboarding.nominee_status);
+            ["VERIFIED", "SKIPPED"].includes(onboarding.nominee_status) &&
+
+            // Velvet financial stages
+            onboarding.finance_status === "VERIFIED" &&
+            onboarding.assets_status === "VERIFIED" &&
+            onboarding.loan_status === "VERIFIED" &&
+            onboarding.insurance_status === "VERIFIED" &&
+
+            // Goals are deferred to a separate ticket.
+            ["VERIFIED", "SKIPPED", "PENDING"].includes(
+                onboarding.goals_status,
+            );
 
         if (is_done && !onboarding.is_completed) {
-            logger.info("All onboarding stages resolved, marking onboarding complete", { user_id });
+            logger.info(
+                "All onboarding stages resolved, marking onboarding complete",
+                { user_id },
+            );
+
             return await db.userOnboarding.update({
                 where: { user_id },
-                data: { is_completed: true, current_stage: "COMPLETED", completed_at: new Date() }
+                data: {
+                    is_completed: true,
+                    current_stage: "COMPLETED",
+                    completed_at: new Date(),
+                },
             });
         }
 
         return onboarding;
-    }
+    };
 
     /**
      * Onboarding status summary shaped for the client - used in the auth response so the
@@ -86,10 +107,17 @@ class UserOnboardingServiceClass {
                 penny_drop: onboarding.penny_drop_status,
                 email: onboarding.email_status,
                 profile: onboarding.profile_status,
-                nominee: onboarding.nominee_status
+                nominee: onboarding.nominee_status,
+
+                // Velvet financial stages
+                finance: onboarding.finance_status,
+                assets: onboarding.assets_status,
+                loan: onboarding.loan_status,
+                insurance: onboarding.insurance_status,
+                goals: onboarding.goals_status,
             },
         };
-    }
+    };
 }
 
 export const user_onboarding_service = new UserOnboardingServiceClass();
