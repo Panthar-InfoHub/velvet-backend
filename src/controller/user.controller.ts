@@ -2,15 +2,18 @@ import { NextFunction, Request, Response } from "express";
 import { user_patch_schema, verify_mpin_schema } from "../lib/zod-schemas/user.schema.js";
 import AppError from "../middleware/error.middleware.js";
 import logger from "../middleware/logger.js";
-import { fire_report_service } from "../services/fire.report.service.js";
+// import { fire_report_service } from "../services/fire.report.service.js";
 import { user_finnsys_service } from "../services/user.finnsys.service.js";
 import { user_savings_service } from "../services/user.savings.service.js";
 import { user_service } from "../services/user.service.js";
 import { pending_orders_service } from "../services/pending_orders.service.js";
 import { wrapper_service } from "../services/wrapper.service.js";
 import { Prisma, UserGoals } from "../prisma/generated/prisma/client.js";
+import { MfTransactionState } from "../prisma/generated/prisma/enums.js";
 import { user_goal_controller } from "./user.goal.controller.js";
 import { redis } from "../lib/redis.js";
+import { db } from "../server.js";
+import { mf_cart_service } from "../services/mf-cart.service.js";
 class UserFinanceControllerClass {
 
 
@@ -41,78 +44,139 @@ class UserFinanceControllerClass {
                 user_loan: true,
                 user_assets: true,
                 user_finance: true,
-                kyc_types: true
+                kyc_types: true,
+                onboarding: true,
+                user_bank_details: true
             });
 
             logger.debug(`User data fetched successfully ==> `, data);
 
-            const { fire_number, net_worth, total_expenses, fire_percentage } = await fire_report_service.get_current_fire_number(user_id);
+            // const { fire_number, net_worth, total_expenses, fire_percentage } = await fire_report_service.get_current_fire_number(user_id);
 
-            const user = req.user!;
-            let goalIdToCurrvalMap = new Map<string, number>();
-            try {
-                const portfolio_res = await wrapper_service.get_user_portfolio_cached(user_id, user.log, user.pwd);
-                if (portfolio_res && portfolio_res.results) {
-                    portfolio_res.results.forEach((item: any) => {
-                        if (item.gid) {
-                            const currval = this.toNumber(item.currval);
-                            const existing = goalIdToCurrvalMap.get(String(item.gid)) || 0;
-                            goalIdToCurrvalMap.set(String(item.gid), existing + currval);
-                        }
-                    });
-                }
-            } catch (error) {
-                logger.warn("Failed to fetch portfolio for mapping goals currval in get_user", error);
-            }
+            // Home-screen summary card: portfolio value split MF / FD. MF comes from MfHolding
+            // (kept in sync by mf-holding-sync.service.ts), FD from the user's own FD transactions -
+            // no live provider call on this path. Runs through the same
+            // user_service.aggregate_portfolio_data as GET /user/portfolio so the two screens can
+            // never disagree on the same number.
+            const holdings = await db.mfHolding.findMany({
+                where: { user_id },
+                select: { isin: true, invested_amount: true, current_value: true },
+            });
 
-            const wrapper_user_goal = data.user_goals.length > 0 ? data.user_goals.map((goal: UserGoals, index: number) => {
+            const mf_current_value = holdings.reduce((sum, h) => sum + Number(h.current_value), 0);
+            const mf_invested_amount = holdings.reduce((sum, h) => sum + Number(h.invested_amount), 0);
 
-                if (goal.goal_id) {
-                    const current_value = goalIdToCurrvalMap.get(String(goal.goal_id)) || 0;
-                    if (current_value > 0) {
-                        const total_amount = Math.abs(Number(goal.current_saved_amount || 0)) + current_value;
-                        (goal as any).current_saved_amount = new Prisma.Decimal(Math.round(total_amount));
-                    }
-                }
+            const mf_investment_data = {
+                current_value: Number(mf_current_value.toFixed(2)),
+                invested_amount: Number(mf_invested_amount.toFixed(2)),
+                total_returns: Number((mf_current_value - mf_invested_amount).toFixed(2)),
+                return_percent: mf_invested_amount > 0
+                    ? Number((((mf_current_value - mf_invested_amount) / mf_invested_amount) * 100).toFixed(2))
+                    : 0,
+                // One entry per distinct fund, matching how the portfolio screen groups its cards
+                // (a fund held across two folios is one holding to the user, not two).
+                items_count: new Set(holdings.map(h => h.isin)).size,
+            };
 
-                if (goal.goal_type_id === 3) {
-                    const years_to_retirement = (goal.retirement_age ?? 0) - (goal.current_age ?? 0);
-                    const years_post_retirement = (goal.life_expectancy ?? 0) - (goal.retirement_age ?? 0);
+            const fd_response = await user_service.get_user_fd_data({ user_id, order: { fd_issued_at: 'desc' } });
+            const portfolio_aggregates = user_service.aggregate_portfolio_data(
+                mf_investment_data,
+                fd_response.fd_transactions || []
+            );
 
-                    const corpus_value = user_goal_controller.calculate_corpus_value(
-                        Number(goal.current_monthly_expense ?? 0),
-                        Number(goal.inflation_rate ?? 0) / 100,       // stored as % (e.g. 7), formula needs 0.07
-                        Number(goal.post_retirement_return ?? 0) / 100, // stored as % (e.g. 6), formula needs 0.06
-                        years_to_retirement,
-                        years_post_retirement
-                    );
+            // const wrapper_user_goal = data.user_goals.length > 0 ? data.user_goals.map((goal: UserGoals, index: number) => {
 
-                    (goal as any).current_goal_cost = new Prisma.Decimal(Math.round(corpus_value));
-                    logger.debug(`Computed corpus value for retirement goal ${goal.goal_id}: ${corpus_value}`);
-                }
-                return goal;
-            }) : data.user_goals
+            //     if (goal.goal_id) {
+            //         const current_value = goalIdToCurrvalMap.get(String(goal.goal_id)) || 0;
+            //         if (current_value > 0) {
+            //             const total_amount = Math.abs(Number(goal.current_saved_amount || 0)) + current_value;
+            //             (goal as any).current_saved_amount = new Prisma.Decimal(Math.round(total_amount));
+            //         }
+            //     }
+
+            //     if (goal.goal_type_id === 3) {
+            //         const years_to_retirement = (goal.retirement_age ?? 0) - (goal.current_age ?? 0);
+            //         const years_post_retirement = (goal.life_expectancy ?? 0) - (goal.retirement_age ?? 0);
+
+            //         const corpus_value = user_goal_controller.calculate_corpus_value(
+            //             Number(goal.current_monthly_expense ?? 0),
+            //             Number(goal.inflation_rate ?? 0) / 100,       // stored as % (e.g. 7), formula needs 0.07
+            //             Number(goal.post_retirement_return ?? 0) / 100, // stored as % (e.g. 6), formula needs 0.06
+            //             years_to_retirement,
+            //             years_post_retirement
+            //         );
+
+            //         (goal as any).current_goal_cost = new Prisma.Decimal(Math.round(corpus_value));
+            //         logger.debug(`Computed corpus value for retirement goal ${goal.goal_id}: ${corpus_value}`);
+            //     }
+            //     return goal;
+            // }) : data.user_goals
 
             res.status(200).json({
                 code: 200,
                 message: "User data fetched successfully",
                 data: {
                     ...data,
-                    user_goals: wrapper_user_goal,
-                    kyc_types: data?.kyc_types?.reduce((acc: any, kyc: any) => {
-                        acc[kyc.kyc_type] = {
-                            status: kyc.status
-                        };
-                        return acc;
-                    }, {}) || {},
-                    kyc_progress: this.calculate_kyc_progress(data?.kyc_types || []),
-                    user_home_data: {
-                        fire_number,
-                        net_worth,
-                        total_expenses,
-                        fire_percentage
-                    }
+                    // `onboarding` is the full UserOnboarding row (included above). is_skip is
+                    // lifted out of it as a convenience flag: basic_details_status is SKIPPED only
+                    // when the user skipped the onboarding flow outright (see the column comment on
+                    // UserOnboarding) - a per-stage skip like nominee_status does not set it.
+                    is_skip: data?.onboarding?.basic_details_status === "SKIPPED",
+                    dashboard: {
+                        portfolio_value: portfolio_aggregates.total_investments.current_value,
+                        mutual_funds: portfolio_aggregates.total_investments.allocation.mutual_funds.value,
+                        fixed_deposits: portfolio_aggregates.total_investments.allocation.fixed_deposits.value,
+                        total_returns: portfolio_aggregates.total_investments.total_returns,
+                        return_percent: portfolio_aggregates.total_investments.return_percent,
+                        // "+5.3% this month" on the design. Deliberately null, not 0 or a guess -
+                        // there is no month-ago baseline to compute it from. UserNetWorthSnapshot is
+                        // the only monthly series we keep and it can't answer this: it stores net
+                        // worth (assets minus liabilities, including stocks/gold/cash/real estate),
+                        // not the MF+FD portfolio value shown here, and its MF figure still comes
+                        // from the retired Finnsys feed. Needs its own decision - see the PR notes.
+                        month_change_percent: null,
+                    },
+                    // user_goals: wrapper_user_goal,
+                    // kyc_types: data?.kyc_types?.reduce((acc: any, kyc: any) => {
+                    //     acc[kyc.kyc_type] = {
+                    //         status: kyc.status
+                    //     };
+                    //     return acc;
+                    // }, {}) || {},
+                    // kyc_progress: this.calculate_kyc_progress(data?.kyc_types || []),
+                    // user_home_data: {
+                    //     fire_number,
+                    //     net_worth,
+                    //     total_expenses,
+                    //     fire_percentage
+                    // }
                 }
+            });
+            return;
+
+        } catch (error) {
+            logger.error(`Error in get_user: ${error}`);
+            next(error);
+            return;
+        }
+    }
+
+
+    get_all_user = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+
+            const users = await db.user.findMany({
+                select: {
+                    id: true,
+                    phone_no: true,
+                    full_name: true,
+                    email: true,
+                }
+            });
+            res.status(200).json({
+                code: 200,
+                message: "User data fetched successfully",
+                data: users
             });
             return;
 
@@ -149,93 +213,29 @@ class UserFinanceControllerClass {
 
     get_user_cart = async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const user_id = req.user?.id!;
+            logger.info(`Fetching user cart for User ID: ${user_id}`);
 
-            const user = req.user!;
-            logger.info(`Fetching user cart for User ID: ${user.id}`);
+            const cart_items = await mf_cart_service.get_cart(user_id);
 
-            const user_cart_res = await user_service.get_user_cart_finnsys(user.log!, user.pwd!)
-
-            logger.debug(`User data fetched successfully ==> `, user_cart_res);
-
-            if (user_cart_res.code === 0) {
-                logger.debug("Empty cart for User ID ==> ", user.id);
-                res.status(200).json({
-                    code: 200,
-                    message: "User cart fetched successfully",
-                    data: {
-                        sip_items: [],
-                        lump_sum_items: []
-                    }
-                });
-                return;
-            }
-
-            if (user_cart_res.code != 1 && user_cart_res.code != 0) {
-                logger.warn(`Failed to fetch user cart from Finnsys for User ID: ${user.id}. Finnsys response code: ${user_cart_res.code}`);
-                throw new AppError("Failed to fetch user cart from Finnsys", 502, "FINNSYS_CART_FETCH_FAILED");
-            }
-
-            const { sip_items, lump_sum_items } = this.extract_cart_items(user_cart_res);
-
-            logger.info("Mapping logo img for funds...")
-            const amc_set = new Set<string>();
-            sip_items.forEach((item: any) => {
-                if (item.amc_name) amc_set.add(item.amc_name);
-            });
-            lump_sum_items.forEach((item: any) => {
-                if (item.amc_name) amc_set.add(item.amc_name);
-            });
-
-            const amc_names = Array.from(amc_set);
-            const logo_map = await wrapper_service.get_logos_of_amc(amc_names);
-
-            const prod_codes: string[] = [];
-            sip_items.forEach((item: any) => prod_codes.push(item.prod_code));
-            lump_sum_items.forEach((item: any) => prod_codes.push(item.prod_code));
-
-            const rules_map = await wrapper_service.get_transaction_rules_by_nse_codes(prod_codes);
-
-            // Enrich items with img_url and transaction_rules
-            const enriched_sip_items = sip_items.map((item: any) => {
-                const isTaxOrElss = /TAX|ELSS/i.test(item.prod_name || item.amc_name || "");
-                const baseAmount = Number(item.sip_amt || item.txn_amount || 0);
-
-                const min_step_up_percent = isTaxOrElss ? 0 : 10;
-                const min_step_up_amt = isTaxOrElss ? 500 : (baseAmount * 0.10);
-
-                return {
-                    ...item,
-                    img_url: logo_map.get(item.amc_name) || "",
-                    transaction_rules: this.extract_relevant_transaction_rules(rules_map.get(item.prod_code), item.sip_freq),
-                    min_step_up_percent,
-                    min_step_up_amt: Math.round(min_step_up_amt)
-                };
-            });
-
-            const enriched_lump_sum_items = lump_sum_items.map((item: any) => ({
-                ...item,
-                img_url: logo_map.get(item.amc_name) || "",
-                transaction_rules: this.extract_relevant_transaction_rules(rules_map.get(item.prod_code))
-            }));
-
-            logger.info("Mapping completed of logo funds")
+            const sip_items = cart_items.filter((item) => item.cart_type === "SIP");
+            const lumpsum_items = cart_items.filter((item) => item.cart_type === "LUMPSUM");
 
             res.status(200).json({
-                code: 200,
+                success: true,
                 message: "User cart fetched successfully",
                 data: {
-                    sip_items: enriched_sip_items,
-                    lump_sum_items: enriched_lump_sum_items
-                }
+                    sip: sip_items,
+                    lumpsum: lumpsum_items,
+                },
             });
             return;
-
         } catch (error) {
             logger.error(`Error in getting user cart: `, error);
             next(error);
             return;
         }
-    }
+    };
 
     get_user_fd_transactions = async (req: Request, res: Response, next: NextFunction) => {
         try {
@@ -301,14 +301,14 @@ class UserFinanceControllerClass {
 
             const user = await user_service.get_user_by_id(usr.id);
 
-            if (!user || !user.nse_client_code) {
+            if (!user) {
                 throw new AppError("User Finnsys credentials or client code not found", 400, "MISSING_FINNSYS_CREDENTIALS");
             }
 
             const data = await pending_orders_service.get_pending_orders(
                 usr.log!,
                 usr.pwd!,
-                user.nse_client_code
+                user.investor_profile
             );
 
             res.status(200).json({
@@ -329,98 +329,175 @@ class UserFinanceControllerClass {
         try {
 
             const user = req.user!;
-            logger.info(`Fetching user portfolio for User ID: ${user.id} user ${user.log} pwd ${user.pwd}`);
+            logger.info(`Fetching user portfolio for User ID: ${user.id}`);
 
-            let user_portfolio_finnsys_res = await wrapper_service.get_user_portfolio_cached(user.id, user.log!, user.pwd!);
-
-            if (!user_portfolio_finnsys_res || (user_portfolio_finnsys_res.code != 1 && user_portfolio_finnsys_res.code != 0)) {
-                logger.warn(`Failed to fetch user portfolio from Finnsys for User ID: ${user.id}. Finnsys response code: ${user_portfolio_finnsys_res?.code}`);
-                throw new AppError("Failed to fetch user portfolio from Finnsys", 502, "FINNSYS_PORTFOLIO_FETCH_FAILED");
+            // Reads MfHolding, not FP live - that table is kept in sync by mf-holding-sync.service.ts
+            // (on-write, once a controller calls it, plus nightly via job.service.ts's
+            // mf_holding_sync_job), so this endpoint never waits on FP.
+            const holdings = await db.mfHolding.findMany({
+                where: { user_id: user.id },
+                include: {
+                    mf_product: {
+                        select: {
+                            id: true,
+                            name: true,
+                            img_url: true,
+                            metrics: {
+                                select: {
+                                    nav_change_pct: true,
+                                },
+                            },
+                            scheme_plan: {
+                                select: {
+                                    sub_category: true,
+                                    fund_category: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: { current_value: "desc" },
+            });
+            const isins = holdings.map((h) => h.isin);
+            const ACTIVE_SIP_STATES: MfTransactionState[] = [
+                MfTransactionState.ACTIVE,
+                MfTransactionState.CONFIRMED,
+                MfTransactionState.SUBMITTED,
+            ];
+            const purchase_plans = await db.mfTransactionPlan.findMany({
+                where: {
+                    user_id: user.id,
+                    plan_type: "PURCHASE",
+                    scheme: { in: isins },
+                    state: { in: ACTIVE_SIP_STATES },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+            // Group plans by scheme ISIN
+            const plans_by_isin = new Map<string, typeof purchase_plans>();
+            for (const plan of purchase_plans) {
+                const list = plans_by_isin.get(plan.scheme) || [];
+                list.push(plan);
+                plans_by_isin.set(plan.scheme, list);
             }
 
-            const user_mf_data = user_portfolio_finnsys_res.results || []
 
-            const investment_data = user_mf_data.length > 0 ? user_mf_data.reduce((acc: any, item: any) => {
-                const invested = this.toNumber(item.purcost);
-                const current = this.toNumber(item.currval);
-                const pl = this.toNumber(item.pl)
 
-                acc.invested_amount += invested;
-                acc.current_value += current;
-                acc.total_returns += pl;
-                return acc;
-            }, {
-                current_value: 0,
-                invested_amount: 0,
-                total_returns: 0,
-            }) : {
-                current_value: 0,
-                invested_amount: 0,
-                total_returns: 0,
-            };
+            // One card per fund, not per folio - a fund held across two folios is combined, matching
+            // what the portfolio screen shows (see mf-holding.prisma for why a fund can span folios).
+            const by_fund = new Map<string, any>();
+            for (const h of holdings) {
+                const invested = Number(h.invested_amount);
+                const current = Number(h.current_value);
+                const existing = by_fund.get(h.isin);
 
-            investment_data.current_value = Number(investment_data.current_value.toFixed(2));
-            investment_data.invested_amount = Number(investment_data.invested_amount.toFixed(2));
-            investment_data.total_returns = Number(investment_data.total_returns.toFixed(2));
-
-            investment_data.return_percent = Number(
-                ((investment_data.total_returns / investment_data.invested_amount) * 100).toFixed(2)
-            );
-            investment_data.items_count = user_mf_data.length;
-            logger.debug(`Calculated user investment data ==> `, investment_data);
-
-            // Group by actualfolio
-            const foliosMap = new Map<string, any>();
-
-            logger.debug("user mf data from finnsys --> ", user_mf_data)
-            user_mf_data.forEach((item: any) => {
-                const folio = item.actualfolio;
-                const actual_folio = item.folio;
-                if (!folio) return;
-
-                if (!foliosMap.has(folio)) {
-                    foliosMap.set(folio, {
-                        folio: folio,
-                        actual_folio: actual_folio,
-                        first_scheme_id: item.schemeid,
-                        category: item.schemetype,
-                        amount: 0,
-                        current_value: 0,
-                        return: 0,
-                        bal_units: 0,
+                if (!existing) {
+                    by_fund.set(h.isin, {
+                        id: h.id,
+                        isin: h.isin,
+                        title: h.mf_product?.name ?? h.fund_name ?? "Mutual Fund",
+                        img_url: h.mf_product?.img_url ?? "",
+                        amount: invested,
+                        category: h.mf_product?.scheme_plan?.fund_category ?? "Other",
+                        sub_category: h.mf_product?.scheme_plan?.sub_category ?? "Other",
+                        nav_as_on: h.nav_as_on,
+                        curr_nav: h.nav,
+                        avg_nav: h.avg_nav,
+                        xirr: h.xirr ? Number(h.xirr) : null,
+                        return_percentage: h.absolute_return,
+                        current_value: current,
+                        bal_units: Number(h.units),
+                        folios: [h.folio_number],
                     });
+                } else {
+                    existing.amount += invested;
+                    existing.current_value += current;
+                    existing.bal_units += Number(h.units);
+                    existing.folios.push(h.folio_number);
                 }
+            }
 
-                const folioGroup = foliosMap.get(folio);
-                folioGroup.amount += this.toNumber(item.purcost);
-                folioGroup.current_value += this.toNumber(item.currval);
-                folioGroup.return += this.toNumber(item.pl);
-                folioGroup.bal_units += this.toNumber(item.balunits)
-            });
+            const mf_investment_items = Array.from(by_fund.values()).map((f: any) => {
 
-            // Get AMC details for the first scheme in each folio
-            const first_scheme_ids = Array.from(foliosMap.values()).map((f: any) => String(f.first_scheme_id)).filter(Boolean);
-            const amc_details_map = await wrapper_service.getAmcDetailsForSchemes(first_scheme_ids);
+                const fund_plans = plans_by_isin.get(f.isin) || [];
+                // Find if user has an active or confirmed/submitted SIP for this fund
+                const active_sip = fund_plans.find(
+                    (p) => p.systematic === true && ACTIVE_SIP_STATES.includes(p.state)
+                );
 
-            const mf_investment_items = Array.from(foliosMap.values()).map((f: any) => {
-                const amc_details = amc_details_map.get(String(f.first_scheme_id)) || { amc_name: "Mutual Fund", img_url: "", product_id: "", transaction_rules: {} };
-                logger.debug("One folio ==> ", f)
                 return {
-                    id: amc_details.product_id,
-                    scheme_id: f.first_scheme_id,
-                    title: amc_details.amc_name || "Mutual Fund",
+                    id: f.id,
+                    title: f.title,
+                    is_sip: Boolean(active_sip),
                     category: f.category,
+                    sub_category: f.sub_category,
+                    nav_as_on: f.nav_as_on,
+                    xirr: f.xirr,
+                    curr_nav: f.curr_nav,
+                    avg_nav: f.avg_nav,
+                    return_percentage: f.return_percentage,
                     amount: Number(f.amount.toFixed(2)),
                     current_value: Number(f.current_value.toFixed(2)),
-                    return: Number(f.return.toFixed(2)),
-                    return_percentage: f.amount > 0 ? Number(((f.return / f.amount) * 100).toFixed(2)) + "%" : "0.00%",
-                    folio: f.folio,
-                    actual_folio: f.actual_folio,
-                    bal_units: Number(f.bal_units.toFixed(2)),
-                    img_url: amc_details.img_url,
-                    transaction_rules: this.extract_relevant_transaction_rules(amc_details.transaction_rules)
-                };
+                    return: Number((f.current_value - f.amount).toFixed(2)),
+                    folio: f.folios[0],
+                    folios: f.folios,
+                    bal_units: Number(f.bal_units.toFixed(4)),
+                    img_url: f.img_url,
+                }
             });
+
+            // Calculate 1-Day Return & Portfolio XIRR
+            let total_mf_1d_return = 0;
+            let total_weighted_xirr = 0;
+            let total_xirr_weight = 0;
+
+            for (const h of holdings) {
+                const current = Number(h.current_value);
+                const nav_change_pct = h.mf_product?.metrics?.nav_change_pct != null
+                    ? Number(h.mf_product.metrics.nav_change_pct)
+                    : 0;
+
+                if (nav_change_pct !== 0 && current > 0) {
+                    total_mf_1d_return += (current * nav_change_pct) / 100;
+                }
+
+                if (h.xirr != null && current > 0) {
+                    total_weighted_xirr += current * Number(h.xirr);
+                    total_xirr_weight += current;
+                }
+            }
+
+            const total_mf_current_value = Number(holdings.reduce((sum, h) => sum + Number(h.current_value), 0).toFixed(2));
+            const total_mf_invested_amount = Number(holdings.reduce((sum, h) => sum + Number(h.invested_amount), 0).toFixed(2));
+            const total_mf_returns = Number((total_mf_current_value - total_mf_invested_amount).toFixed(2));
+            const total_mf_return_percent = total_mf_invested_amount > 0
+                ? Number(((total_mf_returns / total_mf_invested_amount) * 100).toFixed(2))
+                : 0;
+
+            const prev_day_val = total_mf_current_value - total_mf_1d_return;
+            const total_mf_1d_return_percent = prev_day_val > 0
+                ? Number(((total_mf_1d_return / prev_day_val) * 100).toFixed(2))
+                : 0;
+
+            const total_mf_xirr = total_xirr_weight > 0
+                ? Number((total_weighted_xirr / total_xirr_weight).toFixed(2))
+                : null;
+
+            const mf_summary = {
+                current_value: total_mf_current_value,
+                invested_amount: total_mf_invested_amount,
+                total_returns: total_mf_returns,
+                return_percent: total_mf_return_percent,
+                one_day_return: Number(total_mf_1d_return.toFixed(2)),
+                one_day_return_percent: total_mf_1d_return_percent,
+                xirr: total_mf_xirr,
+            };
+
+            const investment_data = {
+                ...mf_summary,
+                items_count: mf_investment_items.length,
+            };
+            logger.debug(`Calculated user investment data ==> `, investment_data);
 
             logger.debug("Mapped user mutual fund folios now proceeding to user fd transactions...");
             const user_fd_response = await user_service.get_user_fd_data({ user_id: user.id, order: { fd_issued_at: 'desc' } });
@@ -454,6 +531,7 @@ class UserFinanceControllerClass {
                 message: "User portfolio fetched successfully",
                 data: {
                     ...portfolio_aggregates,
+                    mf_summary,
                     mutual_funds: mf_investment_items,
                     fixed_deposits: fd_investment_items
                 }
@@ -475,37 +553,41 @@ class UserFinanceControllerClass {
             min_lump_sum_amount: Math.round(rules.min_lump_sum_amount),
             sip_allowed_dates: rules.sip_allowed_dates,
             sip_frequencies: rules.sip_frequencies,
-            min_investment_amount: rules.min_investment_amount,
-            min_lumpsum_add_on_amount: rules.min_lumpsum_add_on_amount,
-            min_redem_qty: rules.min_redem_qty,
-            min_redem_amount: rules.min_redem_amount,
+            // Dropped in the Fintech Primitives migration - these columns no longer exist.
+            // min_investment_amount: rules.min_investment_amount,
+            // min_lumpsum_add_on_amount: rules.min_lumpsum_add_on_amount,
+            // min_redem_qty: rules.min_redem_qty,
+            // min_redem_amount: rules.min_redem_amount,
             min_sip_amount: rules.min_sip_amount // default fallback
         };
 
-        if (sip_freq) {
-            switch (sip_freq) {
-                case "DZ":
-                case "D":
-                    clean_rules.min_sip_amount = rules.min_daily_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-                case "OW":
-                case "WD":
-                    clean_rules.min_sip_amount = rules.min_weekly_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-                case "OM":
-                    clean_rules.min_sip_amount = rules.min_monthly_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-                case "Q":
-                    clean_rules.min_sip_amount = rules.min_quarterly_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-                case "H":
-                    clean_rules.min_sip_amount = rules.min_semi_annual_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-                case "Y":
-                    clean_rules.min_sip_amount = rules.min_annual_sip_amount ?? clean_rules.min_sip_amount;
-                    break;
-            }
-        }
+        // The per-frequency SIP minimums this switched over were dropped with the FP migration.
+        // Left commented rather than rewritten - this whole path gets replaced by MfSchemePlan's
+        // sip_daily_* / sip_monthly_* thresholds.
+        // if (sip_freq) {
+        //     switch (sip_freq) {
+        //         case "DZ":
+        //         case "D":
+        //             clean_rules.min_sip_amount = rules.min_daily_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //         case "OW":
+        //         case "WD":
+        //             clean_rules.min_sip_amount = rules.min_weekly_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //         case "OM":
+        //             clean_rules.min_sip_amount = rules.min_monthly_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //         case "Q":
+        //             clean_rules.min_sip_amount = rules.min_quarterly_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //         case "H":
+        //             clean_rules.min_sip_amount = rules.min_semi_annual_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //         case "Y":
+        //             clean_rules.min_sip_amount = rules.min_annual_sip_amount ?? clean_rules.min_sip_amount;
+        //             break;
+        //     }
+        // }
 
         return clean_rules;
     }
@@ -520,93 +602,66 @@ class UserFinanceControllerClass {
 
             logger.info(`Fetching folio details for User ID: ${user.id}, Folio: ${folio_id}`);
 
-            let user_portfolio_finnsys_res = await wrapper_service.get_user_portfolio_cached(user.id, user.log!, user.pwd!);
+            const holdings = await db.mfHolding.findMany({
+                where: { user_id: user.id, folio_number: folio_id },
+                include: { mf_product: { select: { id: true, name: true, img_url: true } } },
+            });
 
-            if (!user_portfolio_finnsys_res || (user_portfolio_finnsys_res.code != 1 && user_portfolio_finnsys_res.code != 0)) {
-                throw new AppError("Failed to fetch user portfolio from Finnsys", 502, "FINNSYS_PORTFOLIO_FETCH_FAILED");
+            if (holdings.length === 0) {
+                throw new AppError("Folio not found", 404, "MF_FOLIO_NOT_FOUND");
             }
 
-            const user_mf_data = user_portfolio_finnsys_res.results || [];
+            // MfTransactionPlan carries the order/SIP identity (state, next installment, SIP id) -
+            // MfHolding doesn't know about any of that, it only knows current units/value. A folio
+            // can have more than one plan against the same scheme (a SIP and a later lumpsum both
+            // landing here), so this takes the most recently created one per scheme for the
+            // identity fields shown alongside the (already-combined) holding numbers.
+            const isins = holdings.map((h) => h.isin);
+            const plans = await db.mfTransactionPlan.findMany({
+                where: { user_id: user.id, folio_number: folio_id, scheme: { in: isins } },
+                orderBy: { createdAt: "desc" },
+            });
+            const plan_by_isin = new Map<string, (typeof plans)[number]>();
+            for (const plan of plans) {
+                if (!plan_by_isin.has(plan.scheme)) plan_by_isin.set(plan.scheme, plan);
+            }
 
-            // Filter by folio
-            const folio_items = user_mf_data.filter((item: any) => item.actualfolio === folio_id);
-
-            const mf_scheme_ids = folio_items.map((item: any) => String(item.schemeid)).filter(Boolean);
-            const amc_details_map = await wrapper_service.getAmcDetailsForSchemes(mf_scheme_ids);
-
-            const mf_investment_items = folio_items.map((item: any) => {
-                const amc_details = amc_details_map.get(String(item.schemeid));
-
+            const mf_investment_items = holdings.map((h) => {
+                const plan = plan_by_isin.get(h.isin);
                 return {
-                    id: amc_details?.product_id,
-                    scheme_id: item.schemeid,
-                    title: item.schemename,
-                    category: item.schemetype,
-                    amount: Number(item.purcost.replace(/,/g, "")),
-                    is_sip: item.sip,
-                    start_date: item.stdt,
-                    return_percentage: item.abs,
-                    return: this.toNumber(item.pl),
-                    xirr: item.xirr,
-                    current_nav: this.toNumber(item.currnav),
-                    avg_nav: this.toNumber(item.avgcost),
-                    folio: item.actualfolio,
-                    actual_folio: item.folio,
-                    balance_units: item.balunits,
-                    img_url: amc_details?.img_url || ""
+                    id: h.mf_product_id,
+                    mf_holding_id: h.id,
+                    scheme_id: h.isin,
+                    title: h.mf_product?.name ?? h.fund_name ?? "Mutual Fund",
+                    amount: Number(h.invested_amount),
+                    current_value: Number(h.current_value),
+                    is_sip: plan?.systematic ?? false,
+                    start_date: plan?.start_date ?? null,
+                    return_percentage: h.absolute_return ? Number(h.absolute_return) : null,
+                    return: h.unrealized_gain ? Number(h.unrealized_gain) : null,
+                    xirr: h.xirr ? Number(h.xirr) : null,
+                    current_nav: h.nav ? Number(h.nav) : null,
+                    avg_nav: h.avg_nav ? Number(h.avg_nav) : null,
+                    folio: h.folio_number,
+                    actual_folio: h.folio_number,
+                    balance_units: Number(h.units),
+                    img_url: h.mf_product?.img_url || "",
+                    // Plan identity - null on a holding with no matching MfTransactionPlan row
+                    // (e.g. units acquired before this app tracked the order, or IDCW reinvestment).
+                    fp_id: plan?.fp_id ?? null,
+                    state: plan?.state ?? null,
+                    frequency: plan?.frequency ?? null,
+                    next_installment_date: plan?.next_installment_date ?? null,
+                    synced_at: h.synced_at,
                 };
             });
 
             logger.debug("Mf investment items ==> ", mf_investment_items)
-            let final_investment_items = mf_investment_items;
-
-            // Merge xSIP details into the items if any item has a SIP
-            // Finnsys portfolio API flags is_sip but doesn't return SIP registration details
-            // (xsip_reg_no/order_id, sip_amount, sip_status), so we cross-reference the xSIP
-            // registration report by (actual_folio, scheme_id) to fill them in.
-            // NOTE: if this fetch/match fails, items silently stay un-enriched (no error surfaced).
-            const has_sips = mf_investment_items.some(item => item.is_sip === true);
-            if (has_sips) {
-                logger.debug(`User folio funds have sip funds... Checking xSIP report for order_id (xsip reg number)`)
-                const user_data = await user_service.get_user_by_id(user.id);
-
-                logger.debug('User data --> ', user_data)
-                if (user_data && user_data.nse_client_code) {
-                    const xsip_report = await wrapper_service.get_xsip_registration_report_cached(user_data.nse_client_code, user.log!, user.pwd!);
-
-                    logger.debug(`Xsip report ==> `, xsip_report)
-                    if (xsip_report && (xsip_report.code == 1 || xsip_report.code == 0) && xsip_report.data && xsip_report.data.report_data) {
-                        final_investment_items = mf_investment_items.map((item: any) => {
-                            if (item.is_sip === true) {
-
-                                logger.debug(`Checking ${item.folio} / ${item.scheme_id}`)
-                                const matching_sip = xsip_report.data.report_data.find((sip: any) =>
-                                    sip.folio_number === item.actual_folio
-                                    // sip.rta_scheme_code === item.scheme_id
-                                );
-
-                                logger.debug(`matching sip found.....`, matching_sip)
-
-                                if (matching_sip) {
-                                    return {
-                                        ...item,
-                                        xsip_reg_no: matching_sip.xsip_registration_no,
-                                        order_id: matching_sip.xsip_registration_no,
-                                        sip_amount: Number(String(matching_sip.installments_amount).replace(/,/g, "")),
-                                        sip_status: matching_sip.status
-                                    };
-                                }
-                            }
-                            return item;
-                        });
-                    }
-                }
-            }
 
             res.status(200).json({
                 code: 200,
                 message: "Folio details fetched successfully",
-                data: final_investment_items
+                data: mf_investment_items
             });
             return;
         } catch (error) {

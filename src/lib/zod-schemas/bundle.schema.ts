@@ -3,6 +3,7 @@ import { z } from "zod";
 export const bundle_slot_schema = z.object({
     allocation_percentage: z.number().min(0).max(100),
     default_rank: z.number().int().positive(),
+    pre_selected_product_id: z.string().optional().nullable(),
 });
 
 export const bundle_category_schema = z.object({
@@ -23,7 +24,10 @@ export const create_bundle_zod_schema = z.object({
         risk_level: z.string(),
         investment_growth: z.string(),
         investment_time: z.string(),
-    }),
+        start_amount: z.number().optional(),
+        daily_start_amount: z.number().optional(),
+        monthly_start_amount: z.number().optional(),
+    }).passthrough(),
     categories: z.array(bundle_category_schema).min(1, "At least one category is required in a bundle"),
 });
 

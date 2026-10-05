@@ -4,7 +4,6 @@ import { env } from "../lib/config-env.js";
 import AppError from "../middleware/error.middleware.js";
 import logger from "../middleware/logger.js";
 import { job_service } from "../services/job.service.js";
-import { db } from "../server.js";
 
 class JobControllerClass {
 
@@ -59,64 +58,44 @@ class JobControllerClass {
 
 
 
-    daily_mf_job = async (req: Request, res: Response, next: NextFunction) => {
-        try {
+    // daily_mf_job (Finnsys ~30k bulk upsert) removed - see the comment above
+    // job_service.daily_mf_product_job's old location in job.service.ts for the replacement.
 
-            const scheduler_token = req.headers["x-scheduler-token"];
-            const secret = process.env.SCHEDULER_SECRET || "default_secret";
-
-            if (scheduler_token !== secret) {
-                console.warn(`[SECURITY] Unauthorized attempt to access daily mf job with token: ${scheduler_token}`);
-                throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
-            }
-
-            logger.info("Running daily mutual fund job...");
-
-            await job_service.daily_mf_product_job();
-
-            res.status(200).json({
-                success: true,
-                message: "Daily mutual fund job completed successfully"
-            })
-            return;
-
-        } catch (error: any) {
-            console.error("Error while running daily mf job ==> ", error);
-            // logger.error("Error while running daily mf job ==> ", error.message);
-            next(error);
-            return;
-        }
-    }
-
-
+    /**
+     * Historical NAV seed - pulls every curated fund's FULL history from mfapi into MfNavHistory.
+     * Run once before go-live (and again after importing new funds); mf_nav_daily_job appends on
+     * top of it daily. Without this seed the metrics job has no lookback and every return_* is null.
+     */
     mf_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
         try {
-
             const scheduler_token = req.headers["x-scheduler-token"];
+
+            logger.debug(`Scheduler token ${scheduler_token}`);
             const secret = process.env.SCHEDULER_SECRET || "default_secret";
 
+            logger.debug(`Secret token ${secret}`);
             if (scheduler_token !== secret) {
-                console.warn(`[SECURITY] Unauthorized attempt to access mf nav history job with token: ${scheduler_token}`);
+                logger.warn(`[SECURITY] Unauthorized attempt to access mf nav history job with token: ${scheduler_token}`);
                 throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
             }
 
-            logger.info("Running mf nav history job...");
+            logger.info("Running MF NAV history backfill job...");
 
-            await job_service.nav_history_job();
+            const data = await job_service.nav_history_job();
 
             res.status(200).json({
                 success: true,
-                message: "MF NAV history job completed successfully"
+                message: "MF NAV history job completed successfully",
+                data
             })
             return;
-
         } catch (error: any) {
             console.error("Error while running mf nav history job ==> ", error.message);
-            // logger.error("Error while running mf nav history job ==> ", error.message);
             next(error);
             return;
         }
     }
+
     monthly_user_snapshot_job = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const scheduler_token = req.headers["x-scheduler-token"];
@@ -145,34 +124,85 @@ class JobControllerClass {
         }
     }
 
-    mf_single_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
+    // mf_single_nav_history_job disabled alongside mf_nav_history_job - same underlying
+    // job_service.single_nav_history_job is commented out. See the TODO in job.service.ts.
+    // mf_single_nav_history_job = async (req: Request, res: Response, next: NextFunction) => {
+    //     try {
+    //         const scheme_id = req.params.id as string;
+    //         const scheduler_token = req.headers["x-scheduler-token"];
+    //         const secret = process.env.SCHEDULER_SECRET || "default_secret";
+    //         if (scheduler_token !== secret) {
+    //             throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
+    //         }
+    //         await job_service.single_nav_history_job(scheme_id);
+    //         res.status(200).json({ success: true, message: "MF NAV history job completed successfully" })
+    //         return;
+    //     } catch (error: any) {
+    //         next(error);
+    //         return;
+    //     }
+    // }
+
+    /**
+     * Stage 2 of the NAV pipeline - resolve each curated fund's mfapi scheme_code by matching our
+     * ISIN against their master list. Occasional, not daily: the master list only changes when
+     * schemes are added/retired. Returns the unmatched ISINs so gaps are visible.
+     */
+    mf_scheme_code_sync_job = async (req: Request, res: Response, next: NextFunction) => {
         try {
+            // const scheduler_token = req.headers["x-scheduler-token"];
+            // const secret = process.env.SCHEDULER_SECRET || "default_secret";
 
-            const scheme_id = req.params.id as string;
+            // if (scheduler_token !== secret) {
+            //     console.warn(`[SECURITY] Unauthorized attempt to access mf scheme code sync job with token: ${scheduler_token}`);
+            //     throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
+            // }
 
-            logger.info(`Running single nav history job for scheme code: ${scheme_id}...`);
+            logger.info("Running MF scheme code sync job...");
 
-            const scheduler_token = req.headers["x-scheduler-token"];
-            const secret = process.env.SCHEDULER_SECRET || "default_secret";
-
-            if (scheduler_token !== secret) {
-                console.warn(`[SECURITY] Unauthorized attempt to access mf single nav history job with token: ${scheduler_token}`);
-                throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
-            }
-
-            logger.info("Running mf single nav history job...");
-
-            await job_service.single_nav_history_job(scheme_id);
+            const data = await job_service.mf_scheme_code_sync_job();
 
             res.status(200).json({
                 success: true,
-                message: "MF NAV history job completed successfully"
-            })
+                message: "MF scheme code sync completed successfully",
+                data
+            });
             return;
-
         } catch (error: any) {
-            console.error("Error while running mf nav history job ==> ", error.message);
-            // logger.error("Error while running mf nav history job ==> ", error.message);
+            console.error("Error while running mf scheme code sync job ==> ", error.message);
+            next(error);
+            return;
+        }
+    }
+
+    /**
+     * Stage 3 - daily latest-NAV refresh for every fund that has a scheme_code. Writes both
+     * MfProduct.latest_nav/latest_nav_date and an MfNavHistory point.
+     */
+    mf_nav_daily_job = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            // const scheduler_token = req.headers["x-scheduler-token"];
+            // const secret = process.env.SCHEDULER_SECRET || "default_secret";
+
+            // if (scheduler_token !== secret) {
+            //     console.warn(`[SECURITY] Unauthorized attempt to access mf nav daily job with token: ${scheduler_token}`);
+            //     throw new AppError("Unauthorized: Invalid or missing scheduler token", 401, "Unauthorized");
+            // }
+
+            logger.info("Running MF daily NAV job...");
+
+            const data = await job_service.mf_nav_daily_job();
+
+            logger.info(`MF daily NAV job completed. Results --> `, data)
+
+            res.status(200).json({
+                success: true,
+                message: "MF daily NAV job completed successfully",
+                data
+            });
+            return;
+        } catch (error: any) {
+            console.error("Error while running mf nav daily job ==> ", error.message);
             next(error);
             return;
         }
@@ -189,7 +219,6 @@ class JobControllerClass {
             }
 
             logger.info("Running MF metrics calculation job...");
-
             await job_service.calculate_all_mf_metrics();
 
             res.status(200).json({
@@ -197,14 +226,153 @@ class JobControllerClass {
                 message: "MF metrics calculation job completed successfully"
             });
             return;
-
         } catch (error: any) {
             console.error("Error while running mf metrics calc job ==> ", error.message);
             next(error);
             return;
         }
     }
+    mf_scheme_plan_sync_job = async (
+        req: Request,
+        res: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+            if (scheduler_token !== secret) {
+                console.warn(
+                    `[SECURITY] Unauthorized attempt to access MF scheme-plan sync job with token: ${scheduler_token}`
+                );
+                throw new AppError(
+                    "Unauthorized: Invalid or missing scheduler token",
+                    401,
+                    "Unauthorized"
+                );
+            }
+            logger.info("Running MF scheme-plan sync job...");
+            const data = await job_service.mf_scheme_plan_sync_job();
+            res.status(200).json({
+                success: true,
+                message: "MF scheme-plan sync job completed successfully",
+                data,
+            });
+            return;
+        } catch (error: any) {
+            logger.error(
+                "Error while running MF scheme-plan sync job ==> ",
+                error.message
+            );
+            next(error);
+            return;
+        }
+    };
+    mf_scheme_v1_sync_job = async (
+        req: Request,
+        res: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+            if (scheduler_token !== secret) {
+                console.warn(
+                    `[SECURITY] Unauthorized attempt to access MF v1 scheme sync job with token: ${scheduler_token}`
+                );
+                throw new AppError(
+                    "Unauthorized: Invalid or missing scheduler token",
+                    401,
+                    "Unauthorized"
+                );
+            }
+            logger.info("Running MF v1 fund-scheme sync job...");
+            const data = await job_service.mf_scheme_v1_sync_job();
+            res.status(200).json({
+                success: true,
+                message: "MF v1 fund-scheme sync job completed successfully",
+                data,
+            });
+            return;
+        } catch (error: any) {
+            logger.error(
+                "Error while running MF v1 fund-scheme sync job ==> ",
+                error.message
+            );
+            next(error);
+            return;
+        }
+    };
 
+    mf_logo_sync_job = async (
+        req: Request,
+        res: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+            if (scheduler_token !== secret) {
+                console.warn(
+                    `[SECURITY] Unauthorized attempt to access MF logo sync job with token: ${scheduler_token}`
+                );
+                throw new AppError(
+                    "Unauthorized: Invalid or missing scheduler token",
+                    401,
+                    "Unauthorized"
+                );
+            }
+            logger.info("Running MF logo sync job...");
+            const data = await job_service.mf_logo_sync_job();
+            res.status(200).json({
+                success: true,
+                message: "MF logo sync job completed successfully",
+                data,
+            });
+            return;
+        } catch (error: any) {
+            logger.error(
+                "Error while running MF logo sync job ==> ",
+                error.message
+            );
+            next(error);
+            return;
+        }
+    };
+    mf_holding_sync_job = async (
+        req: Request,
+        res: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const scheduler_token = req.headers["x-scheduler-token"];
+            const secret = process.env.SCHEDULER_SECRET || "default_secret";
+            if (scheduler_token !== secret) {
+                console.warn(
+                    `[SECURITY] Unauthorized attempt to access MF holdings sync job with token: ${scheduler_token}`
+                );
+                throw new AppError(
+                    "Unauthorized: Invalid or missing scheduler token",
+                    401,
+                    "Unauthorized"
+                );
+            }
+            logger.info("Running MF holdings sync job...");
+            const data = await job_service.mf_holding_sync_job();
+            res.status(200).json({
+                success: true,
+                message: "MF holdings sync job completed successfully",
+                data,
+            });
+            return;
+        } catch (error: any) {
+            logger.error(
+                "Error while running MF holdings sync job ==> ",
+                error.message
+            );
+            next(error);
+            return;
+        }
+    };
     daily_fd_product_sync_job = async (req: Request, res: Response, next: NextFunction) => {
 
         try {
@@ -233,38 +401,53 @@ class JobControllerClass {
         }
     };
 
+    get_fd_rates_job = async (req: Request, res: Response, next: NextFunction) => {
 
-
-    send_daily_fd_rates = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const startOfDay = new Date();
-            startOfDay.setUTCHours(0, 0, 0, 0);
+            logger.info("FD rate sync job started...");
 
-            // Senior Engineer Note on Timezones: 
-            // If your GCP servers run in UTC, `setUTCHours` means "today" starts at 5:30 AM IST. 
-            // If you need "today" to strictly mean midnight IST, you must offset this!
+            const { data } = await axios.post('https://prod-velvet-357888765640.asia-south1.run.app/api/v1/jobs/send-daily-fd-rates')
 
-            // 2. Fetch the rates updated from the start of the day until now
-            const todayRates = await db.fdInterestRate.findMany({
-                where: {
-                    updatedAt: {
-                        gte: startOfDay,
-                    },
-                },
-            });
+            if (!data) {
+                logger.warn(`Velvet API failed`)
+                throw new AppError(`Velvet API failed`);
+            }
 
-            // 3. Send the data straight back to Janta in the HTTP response
-            return res.status(200).json({
+            if (!data.success || !data.rates || data.rates.length === 0) {
+                logger.debug("No rates updated today. Sync complete.");
+                res.status(200).json({
+                    success: true,
+                    message: "No rates updated today"
+                })
+                return;
+            }
+
+            logger.debug(`Response recieved from velvet server, proceeding to service layer for insertion`)
+
+            const result = await job_service.process_fd_rates(data)
+
+            if (!result.success) {
+                logger.warn(`Something went wrong with process fd rate service`)
+                throw new AppError(`Something went wrong with process fd rate service`);
+            }
+
+            logger.info("FD MASTER SYNC SUCCESSFUL");
+
+            res.status(200).json({
                 success: true,
-                count: todayRates.length,
-                rates: todayRates
-            });
-        } catch (error) {
-            logger.error(`Error fetching and sending fd rates ==> `, error)
+                message: "Daily fd job completed successfully",
+                data: {
+                    success_count: result.success_count
+                }
+            })
+            return;
+        } catch (error: any) {
+            logger.error("CRITICAL: FD Sync Job Failed. Rollback executed.", error.response?.data ?? error.message);
             next(error);
-            return
+            return;
         }
-    }
+    };
+
 }
 
 export const job_controller = new JobControllerClass();

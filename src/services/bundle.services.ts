@@ -1,5 +1,6 @@
 import { db } from "../server.js";
 import { CreateBundleInput } from "../lib/zod-schemas/bundle.schema.js";
+import { Prisma } from "../prisma/generated/prisma/client.js";
 
 class BundleServiceClass {
 
@@ -14,14 +15,18 @@ class BundleServiceClass {
                 commodity_percentage,
                 hybrid_percentage,
                 debt_percentage,
-                meta_data,
+                meta_data: meta_data as Prisma.InputJsonValue,
                 categories: {
                     create: categories.map(category => ({
                         category_name: category.category_name,
                         display_name: category.display_name,
                         total_percentage: category.total_percentage,
                         slots: {
-                            create: category.slots
+                            create: category.slots.map(slot => ({
+                                allocation_percentage: slot.allocation_percentage,
+                                default_rank: slot.default_rank,
+                                pre_selected_product_id: slot.pre_selected_product_id ?? null,
+                            }))
                         }
                     }))
                 }
@@ -29,7 +34,11 @@ class BundleServiceClass {
             include: {
                 categories: {
                     include: {
-                        slots: true
+                        slots: {
+                            include: {
+                                pre_selected_product: true
+                            }
+                        }
                     }
                 }
             }
@@ -42,13 +51,13 @@ class BundleServiceClass {
         const [bundles, total] = await Promise.all([
             db.bundle.findMany({
                 skip,
-                // include: {
-                //     categories: {
-                //         include: {
-                //             slots: true
-                //         }
-                //     }
-                // },
+                include: {
+                    categories: {
+                        include: {
+                            slots: true
+                        }
+                    }
+                },
                 take: limit,
                 orderBy: {
                     bundle_name: 'asc'
@@ -74,7 +83,38 @@ class BundleServiceClass {
             include: {
                 categories: {
                     include: {
-                        slots: true
+                        slots: {
+                            include: {
+                                pre_selected_product: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        isin: true,
+                                        img_url: true,
+                                        latest_nav: true,
+                                        latest_nav_date: true,
+                                        metrics: {
+                                            select: {
+                                                return_1y: true,
+                                                return_3y: true,
+                                                return_5y: true,
+                                            }
+                                        },
+                                        scheme_plan: {
+                                            select: {
+                                                plan_type: true,
+                                                option: true,
+                                                sub_category: true,
+                                                fund_category: true,
+                                                lumpsum_amount_min: true,
+                                                sip_monthly_amount_min: true,
+                                                sip_daily_amount_min: true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

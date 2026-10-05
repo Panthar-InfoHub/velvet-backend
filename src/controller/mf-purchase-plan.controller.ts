@@ -1,0 +1,324 @@
+import { NextFunction, Request, Response } from "express";
+import { isIPv4 } from "net";
+import AppError from "../middleware/error.middleware.js";
+import logger from "../middleware/logger.js";
+import { create_mf_purchase_plan_schema, verify_purchase_plan_confirmation_otp_schema, cancel_mf_purchase_plan_schema, type ResolvedMfPurchasePlanInput } from "../lib/zod-schemas/mf-purchase-plan.schema.js";
+import { fintech_primitive_mf_purchase_plan_service } from "../services/fintech-primitive/mf_purchase_plan.service.js";
+import { mf_transaction_plan_service } from "../services/mf-transaction-plan.service.js";
+import { mf_threshold_validation_service } from "../services/mutual-funds/mf-threshold-validation.service.js";
+import { mf_product_service } from "../services/mutual-funds/mf-product.service.js";
+import { mandate_service } from "../services/mandate.service.js";
+import { user_service } from "../services/user.service.js";
+import { plan_confirmation_otp_service } from "../services/plan-confirmation-otp.service.js";
+import { notification_producer_service } from "../services/notification.producer.service.js";
+import { notification_type } from "../lib/types.js";
+
+class MfPurchasePlanControllerClass {
+
+    create_purchase_plan = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const input = create_mf_purchase_plan_schema.parse(req.body);
+
+            const raw_ip = req.headers["x-forwarded-for"] || req.ip || req.socket.remoteAddress || "127.0.0.1";
+            let user_ip = (Array.isArray(raw_ip) ? raw_ip[0] : raw_ip).split(",")[0].replace("::ffff:", "").trim();
+
+            // Fintech Primitives only accepts IPv4 addresses. 
+            // If the user connects via IPv6 (e.g. from a mobile network), we must fallback.
+            if (!isIPv4(user_ip)) {
+                user_ip = "127.0.0.1";
+            }
+
+            const user = await user_service.get_user_by_id(user_id);
+            if (!user?.investment_account) {
+                throw new AppError("Investment account not set up yet - complete the profile stage first", 400, "INVESTMENT_ACCOUNT_MISSING");
+            }
+
+            // Validate that the provided mandate_id exists and belongs to this user
+            const mandate = await mandate_service.get_user_mandate(user_id, input.mandate_id);
+            if (!mandate) {
+                throw new AppError("Mandate not found for this user", 404, "MANDATE_NOT_FOUND");
+            }
+
+            // Enforce dedicated per-SIP mandate (no mandate reuse across active SIP plans)
+            const is_already_used = await mf_transaction_plan_service.is_mandate_already_used(mandate.mandate_id);
+            if (is_already_used) {
+                throw new AppError(
+                    "This mandate is already linked to an existing SIP plan. Every SIP requires a newly created mandate.",
+                    400,
+                    "MANDATE_ALREADY_USED"
+                );
+            }
+
+            // The client names the fund by our catalogue id; the ISIN FP needs is derived here.
+            // An unresolvable id is rejected before FP is called, so no plan can exist against a
+            // fund we don't have - which is what guarantees mf_product_id is never null on the row.
+            const product = await mf_product_service.get_by_id(input.mf_product_id);
+            if (!product) {
+                throw new AppError("Fund not found in the catalogue", 404, "MF_PRODUCT_NOT_FOUND");
+            }
+
+            const { mf_product_id, mandate_id, ...rest } = input;
+            const resolved_input: ResolvedMfPurchasePlanInput = { ...rest, scheme: product.isin };
+
+            logger.info("Creating MF purchase plan", { user_id, scheme: product.isin, amount: input.amount, frequency: input.frequency, mandate_id: mandate.mandate_id });
+
+            const min_installments = await mf_threshold_validation_service.get_sip_min_installments(
+                product.isin, input.frequency
+            );
+
+            // Per-fund limits before the FP call. installment_day is checked against the fund's own
+            // allowed dates here - the zod bound is only a loose sanity check.
+            // No-op until the scheme-plan sync populates MfSchemePlan for this fund.
+            await mf_threshold_validation_service.validate_sip(
+                product.isin, input.amount, input.frequency, input.installment_day, min_installments
+            );
+
+            const plan = await fintech_primitive_mf_purchase_plan_service.create_purchase_plan(
+                resolved_input, user.investment_account, mandate.mandate_id, user_ip, min_installments
+            );
+
+            if (!plan?.id) {
+                logger.error("FP mf_purchase_plan response missing id ==> ", plan);
+                throw new AppError("Failed to create MF purchase plan", 502, "MF_PURCHASE_PLAN_CREATE_FAILED");
+            }
+
+            await mf_transaction_plan_service.upsert_from_fp(user_id, "PURCHASE", plan, true);
+
+            res.status(200).json({
+                success: true,
+                message: "MF purchase plan created",
+                data: plan
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in create_purchase_plan controller:", error);
+            next(error);
+            return;
+        }
+    }
+
+    get_purchase_plans = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const raw_state = (req.query.state as string)?.trim().toUpperCase();
+            const state = raw_state as any;
+
+            const purchase_plans = await mf_transaction_plan_service.get_all(
+                user_id,
+                "PURCHASE",
+                true,
+                state,
+                true
+            );
+
+            res.status(200).json({
+                success: true,
+                message: "MF purchase plans fetched",
+                data: { purchase_plans }
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in get_purchase_plans controller:", error);
+            next(error);
+            return;
+        }
+    }
+
+    /** Polls FP for the plan's current state (created -> review_completed -> ...) and syncs our row. */
+    fetch_purchase_plan = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const fp_purchase_plan_id = req.params.id as string;
+
+            logger.info("Fetching MF purchase plan status", { user_id, fp_purchase_plan_id });
+
+            const existing = await mf_transaction_plan_service.get_by_fp_id(user_id, fp_purchase_plan_id);
+            if (!existing) {
+                throw new AppError("Purchase plan not found", 404, "MF_PURCHASE_PLAN_NOT_FOUND");
+            }
+
+            const plan = await fintech_primitive_mf_purchase_plan_service.get_purchase_plan(fp_purchase_plan_id);
+            const updated = await mf_transaction_plan_service.upsert_from_fp(user_id, "PURCHASE", plan, true);
+
+            res.status(200).json({
+                success: true,
+                message: "MF purchase plan fetched",
+                data: updated
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in get_purchase_plans controller:", error);
+            next(error);
+            return;
+        }
+    }
+
+    /** Step 1 of confirming a review_completed plan - send the OTP to the user's own phone. */
+    request_confirmation_otp = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const fp_purchase_plan_id = req.params.id as string;
+
+            const plan = await mf_transaction_plan_service.get_by_fp_id(user_id, fp_purchase_plan_id);
+            if (!plan) {
+                throw new AppError("Purchase plan not found", 404, "MF_PURCHASE_PLAN_NOT_FOUND");
+            }
+            if (plan.state !== "REVIEW_COMPLETED") {
+                throw new AppError(`Plan must be in review_completed state to confirm, currently ${plan.state}`, 400, "MF_PURCHASE_PLAN_NOT_REVIEW_COMPLETED");
+            }
+
+            const user = await user_service.get_user_by_id(user_id);
+            logger.info("Requesting purchase plan confirmation OTP", { user_id, fp_purchase_plan_id });
+
+            await plan_confirmation_otp_service.request_otp(user_id, fp_purchase_plan_id, user.phone_no);
+
+            res.status(200).json({
+                success: true,
+                message: "OTP sent",
+                data: null
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in request_confirmation_otp controller:", error);
+            next(error);
+            return;
+        }
+    }
+
+    /**
+     * Step 2 - verify the OTP, then immediately call FP's Update Purchase Plan API with
+     * consent + state: "confirmed". Requires an APPROVED mandate as payment_source, per the
+     * docs' ondc note - the plan already has one set from create, so just re-checked here.
+     */
+    verify_confirmation_otp = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const fp_purchase_plan_id = req.params.id as string;
+            const { otp } = verify_purchase_plan_confirmation_otp_schema.parse(req.body);
+
+            const plan = await mf_transaction_plan_service.get_by_fp_id(user_id, fp_purchase_plan_id);
+            if (!plan) {
+                throw new AppError("Purchase plan not found", 404, "MF_PURCHASE_PLAN_NOT_FOUND");
+            }
+
+            const user = await user_service.get_user_by_id(user_id);
+            if (!user?.email || !user?.phone_no) {
+                throw new AppError("User email and phone number are required to confirm", 400, "USER_CONTACT_INFO_MISSING");
+            }
+
+            logger.info("Verifying purchase plan confirmation OTP", { user_id, fp_purchase_plan_id });
+
+            await plan_confirmation_otp_service.verify_otp(user_id, fp_purchase_plan_id, otp);
+
+            const confirmed = await fintech_primitive_mf_purchase_plan_service.confirm_purchase_plan(fp_purchase_plan_id, {
+                email: user.email,
+                isd_code: "91",
+                mobile: user.phone_no,
+            });
+
+            const updated = await mf_transaction_plan_service.upsert_from_fp(user_id, "PURCHASE", confirmed, true);
+            await mf_transaction_plan_service.mark_consent_given(updated.id);
+
+            await notification_producer_service.publish_notification_event(
+                user.id,
+                "TRANSACTION",
+                "SIP purchase initiated",
+                `Your SIP purchase has been initiated`,
+                {
+                    txn: "mf",
+                    sub_type: notification_type.FUND_INC
+                }
+            );
+
+            res.status(200).json({
+                success: true,
+                message: "Purchase plan confirmed",
+                data: updated
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in verify_confirmation_otp controller:", error);
+            next(error);
+            return;
+        }
+    }
+    cancel_purchase_plan = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const fp_purchase_plan_id = req.params.id as string;
+
+            const { cancellation_code } = cancel_mf_purchase_plan_schema.parse(req.body);
+
+            const plan = await mf_transaction_plan_service.get_by_fp_id(
+                user_id,
+                fp_purchase_plan_id
+            );
+
+            if (!plan) {
+                throw new AppError(
+                    "Purchase plan not found",
+                    404,
+                    "MF_PURCHASE_PLAN_NOT_FOUND"
+                );
+            }
+
+            if (plan.plan_type !== "PURCHASE" || !plan.systematic) {
+                throw new AppError(
+                    "Only SIP purchase plans can be cancelled through this endpoint",
+                    400,
+                    "MF_PURCHASE_PLAN_CANCEL_NOT_ALLOWED"
+                );
+            }
+
+            if (plan.state !== "ACTIVE") {
+                throw new AppError(
+                    "Only active purchase plans can be cancelled",
+                    400,
+                    "MF_PURCHASE_PLAN_CANCEL_NOT_ALLOWED"
+                );
+            }
+
+            logger.info("Cancelling MF purchase plan", {
+                user_id,
+                fp_purchase_plan_id,
+                cancellation_code
+            });
+
+            const cancelled_plan =
+                await fintech_primitive_mf_purchase_plan_service.cancel_purchase_plan(
+                    fp_purchase_plan_id,
+                    cancellation_code
+                );
+
+            if (!cancelled_plan?.id) {
+                throw new AppError(
+                    "Invalid response from FP while cancelling purchase plan",
+                    502,
+                    "MF_PURCHASE_PLAN_CANCEL_RESPONSE_INVALID"
+                );
+            }
+
+            const updated = await mf_transaction_plan_service.upsert_from_fp(
+                user_id,
+                "PURCHASE",
+                cancelled_plan,
+                true,
+                cancellation_code
+            );
+
+            res.status(200).json({
+                success: true,
+                message: "MF purchase plan cancelled",
+                data: updated
+            });
+            return;
+        } catch (error) {
+            logger.error("Error in cancel_purchase_plan controller:", error);
+            next(error);
+            return;
+        }
+    };
+}
+
+export const mf_purchase_plan_controller = new MfPurchasePlanControllerClass();

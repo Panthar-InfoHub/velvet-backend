@@ -1,15 +1,16 @@
 import { env } from "../lib/config-env.js";
 import { FdCustomerType, FdPayoutFrequency, Prisma } from "../prisma/generated/prisma/client.js";
-import { chunkArray, logMemoryUsage, map_mf_asset_type } from "../lib/utils.js";
-import { v4 as uuidv4 } from 'uuid';
+import { chunkArray, logMemoryUsage } from "../lib/utils.js";
 import cuid from 'cuid';
 import axios from "axios";
 import logger from "../middleware/logger.js";
 import { db } from "../server.js";
 import pLimit from "p-limit";
-import { MfNavHistoryCreateManyInput } from "../prisma/generated/prisma/models.js";
+import { mfapi_service } from "./mutual-funds/mfapi.service.js";
 import { user_snapshot_service } from "./user/user.snapshot.service.js";
-
+import { mf_scheme_plan_sync_service } from "./mutual-funds/mf-scheme-plan-sync.service.js";
+import { mf_scheme_v1_sync_service } from "./mutual-funds/mf-scheme-v1-sync.service.js";
+import { mf_holding_sync_service } from "./mutual-funds/mf-holding-sync.service.js";
 
 class JobServiceClass {
 
@@ -25,149 +26,158 @@ class JobServiceClass {
         }
     }
 
-    daily_mf_product_job = async () => {
-
-        logMemoryUsage("START OF JOB");
-
-        const api_res = await axios.get(`${env.FINNSYS_MASTER_URL}`, {
-            params: {
-                gwname: "NSE",
-                ...(env.ENVIRONMENT === "dev" && { tot: 5 })
-            }
-        }).then(res => res.data);
-
-        const api_data: any[] = api_res.result ?? [];
-        if (api_data.length === 0) return logger.info("No data received.");
+    // daily_mf_product_job (the Finnsys ~30k bulk upsert) was removed as part of the Cybrilla/FP
+    // migration - replaced by POST /api/v2/admin/mf-product-import (curated JSON list) and the
+    // per-ISIN sync job TODO'd in job.router.ts. Unlike the NAV jobs below, this had a clear,
+    // already-decided replacement, so there was nothing worth leaving commented as a breadcrumb.
 
 
-        const batches = chunkArray(api_data, 1000);
+    mf_scheme_plan_sync_job = async () => {
+        logger.info("Starting MF scheme-plan sync job...");
 
-        try {
-            // --- START OF GLOBAL TRANSACTION ---
-            // Everything inside this block is "All-or-Nothing"
-            await db.$transaction(async (tx) => {
+        const products = await db.mfProduct.findMany({
+            select: {
+                id: true,
+                isin: true,
+            },
+            orderBy: {
+                id: "asc",
+            },
+        });
 
-                for (const batch of batches) {
+        logger.info(
+            `[MF SCHEME SYNC] Found ${products.length} curated MF products`
+        );
 
-
-                    // -> Prepare MF Product Values
-                    const product_values = batch.map((mf: any) => {
-                        const navDate = mf.NAV_DATE ? new Date(mf.NAV_DATE) : new Date();
-                        const normalizedAssetType = map_mf_asset_type(mf.ASSET_TYPE_ID, mf.ASSET_TYPE);
-                        return Prisma.sql`(
-                        ${uuidv4()}, ${String(mf.SCHM_ID)}, ${mf.ISIN || ""}, ${mf.MAPPING_CODE}, ${mf.NSE_SCHEME_CODE || ""}, ${mf.PLATFORM_SCHEME_CODE}, ${mf.SCHEME_NAME},
-                        ${mf.AMC_ID ? String(mf.AMC_ID) : null}, ${mf.AMC_CODE}, ${mf.AMC_NAME}, 
-                        ${normalizedAssetType}, ${mf.SCHEME_TYPE}, ${mf.STRUCTURE}, ${mf.RISK_NAME}, 
-                        ${mf.RISK_ID ? parseInt(mf.RISK_ID) : null}, ${mf.NAV ? parseFloat(mf.NAV) : null},
-                        ${navDate}, ${mf.PURCHASE_ALLOWED === "Y"}, ${mf.SIP_ALLOWED === "Y"}, 
-                        ${mf.REDEMPTION_ALLOWED === "Y"}, ${mf.SWITCH_ALLOWED === "Y"}, NOW()
-                    )`;
-                    });
-
-                    // -> Execute Bulk Upsert for Products with RETURNING to get actual IDs back
-                    // Why raw sql? Because prisma don't support upsertMany and we want to do this in 1 query for 30k records
-                    // RETURNING gives us the real id for both new inserts AND conflict-updated rows — no extra findMany needed
-                    const products: { id: string, scheme_id: string, isin: string | null, nse_scheme_code: string | null, mapping_code: string | null }[] = await tx.$queryRaw`
-                    INSERT INTO "MfProduct" (
-                        id, scheme_id, isin, mapping_code, nse_scheme_code, platform_code, scheme_name, 
-                        amc_id, amc_code, amc_name, asset_type, scheme_type, 
-                        structure, risk_name, risk_level, latest_nav, 
-                        latest_nav_date, purchase_allowed, sip_allowed, 
-                        redemption_allowed, switch_allowed, "updatedAt"
-                    )
-                    VALUES ${Prisma.join(product_values)}
-                    ON CONFLICT (scheme_id, isin, nse_scheme_code) DO UPDATE SET
-                        latest_nav = EXCLUDED.latest_nav,
-                        latest_nav_date = EXCLUDED.latest_nav_date,
-                        purchase_allowed = EXCLUDED.purchase_allowed,
-                        sip_allowed = EXCLUDED.sip_allowed,
-                        redemption_allowed = EXCLUDED.redemption_allowed,
-                        switch_allowed = EXCLUDED.switch_allowed,
-                        "updatedAt" = NOW()
-                    RETURNING id, scheme_id, isin, nse_scheme_code, mapping_code;
-                `;
-
-                    logger.info(`Batch of ${batch.length} products upserted successfully.`);
-
-                    // -> Create a Map for O(1) access to product IDs (built directly from RETURNING result)
-                    const productMap = new Map(products.map(p => [
-                        `${p.scheme_id}-${p.isin || ""}-${p.nse_scheme_code || ""}`.toUpperCase(),
-                        p.id
-                    ]));
-                    logger.debug(`Product Map created with ${productMap.size} entries.`);
-
-                    // -> Prepare & Execute Metrics and Rules Bulk Upsert
-
-                    const ruleValues: Prisma.Sql[] = [];
-
-                    for (const mf of batch) {
-                        const tripleKey = `${mf.SCHM_ID}-${mf.ISIN || ""}-${mf.NSE_SCHEME_CODE || ""}`.toUpperCase();
-                        const pId = productMap.get(tripleKey);
-                        if (!pId) continue;
-
-                        // Transaction Rules Data
-                        const sipDates = mf.SIP_DATES ? mf.SIP_DATES.split(",").map(Number) : [];
-                        const freq = mf.SYSTEMATIC_FREQUENCIES ? mf.SYSTEMATIC_FREQUENCIES.split(",") : [];
-                        ruleValues.push(Prisma.sql`(${cuid()}, ${pId}, ${sipDates}, ${freq}, ${Number(mf.MIN_SIP_AMT ?? 0)}, ${Number(mf.MIN_PUR_AMT ?? 0)}, NOW())`);
-                    }
-
-                    if (ruleValues.length > 0) {
-                        await tx.$executeRaw`
-                        INSERT INTO "MfSchemeTransactionRules" (id, mf_product_id, sip_allowed_dates, sip_frequencies, min_sip_amount, min_lump_sum_amount, "updatedAt")
-                        VALUES ${Prisma.join(ruleValues)}
-                        ON CONFLICT (mf_product_id) DO UPDATE SET
-                            sip_allowed_dates = EXCLUDED.sip_allowed_dates,
-                            sip_frequencies = EXCLUDED.sip_frequencies,
-                            min_sip_amount = EXCLUDED.min_sip_amount,
-                            min_lump_sum_amount = EXCLUDED.min_lump_sum_amount,
-                            "updatedAt" = NOW();
-                    `;
-                    }
-                    logger.info(`Batch of mf rules : ${ruleValues.length} rules upserted successfully.`);
-
-                    // -> Append today's NAV to history (prevents need for heavy full-history job in production)
-                    const navHistoryValues: Prisma.Sql[] = [];
-
-                    for (const mf of batch) {
-                        const tripleKey = `${mf.SCHM_ID}-${mf.ISIN}-${mf.NSE_SCHEME_CODE}`.toUpperCase();
-                        const pId = productMap.get(tripleKey);
-                        if (!pId || !mf.NAV) continue;
-
-                        const navDate = mf.NAV_DATE ? new Date(mf.NAV_DATE) : new Date();
-                        navHistoryValues.push(Prisma.sql`(
-                            ${cuid()}, ${pId}, ${String(mf.MAPPING_CODE)},
-                            ${parseFloat(mf.NAV)}, ${navDate}, NOW()
-                        )`);
-                    }
-
-                    if (navHistoryValues.length > 0) {
-                        await tx.$executeRaw`
-                            INSERT INTO "MfNavHistory" (id, mf_product_id, scheme_id, nav, nav_date, "updatedAt")
-                            VALUES ${Prisma.join(navHistoryValues)}
-                            ON CONFLICT (mf_product_id, nav_date) DO NOTHING;
-                        `;
-                    }
-                    logger.info(`Batch: ${navHistoryValues.length} NAV history points appended.`);
-
+        // FP has no bulk endpoint, so limit concurrent requests.
+        // The old NAV job used pLimit(2), so use the same conservative limit.
+        const limit = pLimit(2);
+        let successful = 0;
+        let failed = 0;
+        const tasks = products.map((product) =>
+            limit(async () => {
+                try {
+                    await mf_scheme_plan_sync_service.sync_by_isin(product.isin);
+                    successful++;
+                    logger.info(
+                        `[MF SCHEME SYNC] Successfully synced ISIN ${product.isin}`);
+                } catch (error: any) {
+                    failed++;
+                    logger.error(
+                        `[MF SCHEME SYNC] Failed to sync ISIN ${product.isin}`,
+                        {
+                            isin: product.isin,
+                            error: error?.message,
+                        });
                 }
-            }, {
-                timeout: 60000, // Increase timeout to 60s for 30k records
-                maxWait: 10000
-            });
+            }));
+        await Promise.allSettled(tasks);
+        const result = {
+            total: products.length,
+            successful,
+            failed,
+        };
+        logger.info(
+            "[MF SCHEME SYNC] Scheme-plan sync job completed",
+            result);
+        return result;
+    };
 
-            logger.info(`Daily MF Sync: ${api_data.length} synchronized atomically.`);
-            return true;
+    /**
+     * Fills the v1-owned half of MfSchemePlan (category, switch/STP limits, capability flags) from
+     * FP's older /api/oms/fund_schemes endpoint. Runs AFTER mf_scheme_plan_sync_job, which creates
+     * the rows this one updates - a fund with no row yet is counted as skipped, not failed, since
+     * the next run picks it up once the v2 job has been through.
+     */
+    mf_scheme_v1_sync_job = async () => {
+        logger.info("Starting MF v1 fund-scheme sync job...");
 
-        } catch (error) {
-            logger.error("FATAL: Mutual Fund Job failed. Database rolled back to previous state.", error);
-            throw error;
-        } finally {
-            logMemoryUsage("END OF JOB"); // Check if memory cleared or leaked
-        }
-    }
+        // Driven off MfSchemePlan, not MfProduct: this job only ever updates existing rows, so a
+        // product the v2 sync hasn't reached yet has nothing to update.
+        const scheme_plans = await db.mfSchemePlan.findMany({
+            select: { isin: true },
+            orderBy: { isin: "asc" },
+        });
 
+        logger.info(`[MF SCHEME V1 SYNC] Found ${scheme_plans.length} scheme plans to enrich`);
 
+        // Same conservative concurrency as the v2 sync - one HTTP call per ISIN, no bulk endpoint.
+        const limit = pLimit(2);
+        let successful = 0;
+        let failed = 0;
+        const tasks = scheme_plans.map((plan) =>
+            limit(async () => {
+                try {
+                    await mf_scheme_v1_sync_service.sync_by_isin(plan.isin);
+                    successful++;
+                    logger.info(`[MF SCHEME V1 SYNC] Successfully synced ISIN ${plan.isin}`);
+                } catch (error: any) {
+                    failed++;
+                    logger.error(`[MF SCHEME V1 SYNC] Failed to sync ISIN ${plan.isin}`, {
+                        isin: plan.isin,
+                        error: error?.message,
+                    });
+                }
+            })
+        );
+        await Promise.allSettled(tasks);
 
+        const result = { total: scheme_plans.length, successful, failed };
+        logger.info("[MF SCHEME V1 SYNC] v1 fund-scheme sync job completed", result);
+        return result;
+    };
+
+    /**
+     * Backfill/refresh AMC logos on MfProduct from logo_data_v2.json for all schemes with amc_id.
+     * Can be run independently without calling external FP endpoints.
+     */
+    mf_logo_sync_job = async () => {
+        logger.info("Starting MF AMC logo sync job...");
+        return await mf_scheme_v1_sync_service.sync_all_logos();
+    };
+
+    /**
+     * Nightly refresh of MfHolding for every account. Same call any of our own controllers should
+     * make right after a transaction succeeds (mf-holding-sync.service.ts) - this is the backstop
+     * for settlement that happens without the user opening the app (an installment going through,
+     * NAV moving). One account with no holdings is a no-op at FP's end, not an error, so this is
+     * safe to run against every user with an investment account rather than a filtered subset.
+     */
+    mf_holding_sync_job = async () => {
+        logger.info("Starting MF holdings sync job...");
+
+        const users = await db.user.findMany({
+            where: { AND: [{ investment_account: { not: null } }, { investment_account_old_id: { not: null } }] },
+            select: { id: true, investment_account: true, investment_account_old_id: true },
+        });
+
+        logger.info(`[MF HOLDINGS SYNC] Found ${users.length} users with an investment account`);
+
+        // One user's sync = 2 FP calls (holdings + scheme-wise-returns), not per-fund/per-folio,
+        // so this stays cheap even at scale. Same conservative concurrency as the scheme-plan job.
+        const limit = pLimit(2);
+        let successful = 0;
+        let failed = 0;
+        const tasks = users.map((user) =>
+            limit(async () => {
+                try {
+                    await mf_holding_sync_service.sync_account(user.id, user.investment_account!, user.investment_account_old_id);
+                    successful++;
+                } catch (error: any) {
+                    failed++;
+                    logger.error(`[MF HOLDINGS SYNC] Failed to sync user ${user.id}`, {
+                        user_id: user.id,
+                        error: error?.message,
+                    });
+                }
+            })
+        );
+        await Promise.allSettled(tasks);
+
+        const result = { total: users.length, successful, failed };
+        logger.info("[MF HOLDINGS SYNC] Holdings sync job completed", result);
+        return result;
+    };
 
     daily_fd_job = async (token: string) => {
         try {
@@ -299,39 +309,8 @@ class JobServiceClass {
                                 }
 
                                 freqGroup.tenure_mapping?.forEach((tm: any) => {
-                                    const tenureLabel = (tm.year || tm.display || `${tm.tenure} Days`).trim();
-                                    // Unique constraint: (fd_product_id, payout_frequency, tenure_label, customer_type)
-                                    const uniqueKey = `${pId}|${mappedFreq}|${tenureLabel}|${customerType}`;
-
-                                    let tenureDays = parseInt(tm.tenure || '0', 10);
-                                    if (isNaN(tenureDays)) tenureDays = 0;
-
-                                    const lowerLabel = tenureLabel.toLowerCase();
-                                    const monthMatch = lowerLabel.match(/^(\d+)\s*month/);
-                                    const yearMatch = lowerLabel.match(/^(\d+)\s*year/);
-
-                                    const monthToDaysMap: Record<number, number> = {
-                                        12: 365,
-                                        18: 548,
-                                        24: 730,
-                                        31: 943,
-                                        36: 1095,
-                                        42: 1278,
-                                        48: 1461,
-                                        50: 1521,
-                                        60: 1826,
-                                    };
-
-                                    // Normalize tenure_days when Blostem sends tenure in months/years instead of days
-                                    if (monthMatch && (tenureDays <= 60 || tenureDays === parseInt(monthMatch[1], 10))) {
-                                        const months = parseInt(monthMatch[1], 10);
-                                        tenureDays = monthToDaysMap[months] || Math.round(months * (365 / 12));
-                                    } else if (yearMatch && tenureDays <= 10) {
-                                        const years = parseInt(yearMatch[1], 10);
-                                        tenureDays = Math.round(years * 365);
-                                    } else if (lowerLabel.includes('month') && tenureDays <= 60 && tenureDays > 0) {
-                                        tenureDays = monthToDaysMap[tenureDays] || Math.round(tenureDays * (365 / 12));
-                                    }
+                                    // Unique constraint: (fd_product_id, payout_frequency, tenure_days, customer_type)
+                                    const uniqueKey = `${pId}|${mappedFreq}|${tm.tenure}|${customerType}`;
 
                                     if (seenUniqueKeys.has(uniqueKey)) {
                                         duplicatesSkipped++;
@@ -339,7 +318,7 @@ class JobServiceClass {
                                         seenUniqueKeys.add(uniqueKey);
                                         rateValues.push(Prisma.sql`(
                                         ${cuid()}, ${pId}, ${mappedFreq}::"FdPayoutFrequency", ${customerType}::"FdCustomerType", 
-                                        ${tenureDays}, ${tenureLabel}, ${parseFloat(tm.rates.replace('%', ''))}, 
+                                        ${tm.tenure}, ${tm.year || tm.display}, ${parseFloat(tm.rates.replace('%', ''))}, 
                                         ${parseFloat(tm.annualizedYield?.replace('%', '') || '0')},
                                         ${tm.default === true}, null, NOW()
                                     )`);
@@ -361,10 +340,8 @@ class JobServiceClass {
                             VALUES ${Prisma.join(rateValues)}
                             ON CONFLICT (fd_product_id, payout_frequency, tenure_label, customer_type) 
                             DO UPDATE SET 
-                                tenure_days = EXCLUDED.tenure_days,
                                 interest_rate = EXCLUDED.interest_rate,
                                 annualized_yield = EXCLUDED.annualized_yield, 
-                                is_default_selection = EXCLUDED.is_default_selection,
                                 "updatedAt" = NOW();
                         `;
                             logger.debug(`[FD SYNC] STEP D: Interest rate upsert completed successfully`);
@@ -393,134 +370,143 @@ class JobServiceClass {
 
 
 
+    /**
+     * mfapi returns dates as DD-MM-YYYY ("29-05-2008"), which `new Date()` parses as Invalid Date.
+     * Reorders to YYYY-MM-DD before parsing. Returns null on anything unparseable so callers can
+     * skip the record rather than writing a bad timestamp.
+     */
+    private parse_mfapi_date = (raw: string): Date | null => {
+        if (typeof raw !== "string") return null;
 
+        const parts = raw.split("-");
+        const parsed = (parts.length === 3 && parts[0].length === 2)
+            ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+            : new Date(raw);
+
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
 
     /**
-     * Scheduled Job to fetch and store NAV history for mutual funds
-     * Flow :
-     * 1. Fetch all mutual fund products from the database.
-     * 2. For each product, call the external API to get NAV history.
-     * 3. Store the NAV history in the database.
+     * Stage 2 of the NAV pipeline: resolve each curated fund's mfapi scheme_code.
+     *
+     * mfapi has no lookup-by-isin endpoint, so this pulls the whole master list once (~40k rows)
+     * and builds an in-memory isin -> schemeCode map. Both isinGrowth and isinDivReinvestment are
+     * indexed - a fund sits in one or the other depending on whether it's the growth or the
+     * IDCW-reinvestment plan, and ISINs are globally unique so either match is the right fund.
+     *
+     * Returns the unmatched ISINs: those funds have no code, so mf_nav_daily_job will skip them
+     * and they'll never get a NAV until someone looks into why.
      */
-    nav_history_job = async () => {
+    mf_scheme_code_sync_job = async () => {
+        const master = await mfapi_service.get_master_list();
 
-        const endDate = (new Date()).toISOString().split('T')[0];
-        const startDate = (new Date(new Date().setFullYear(new Date().getFullYear() - 5))).toISOString().split('T')[0];
-
-        logger.debug(`NAV History Job: startDate=${startDate} endDate=${endDate}`);
-
-        // const mf_products = await db.mfProduct.findMany({
-        //     select: { id: true, scheme_id: true, mapping_code: true }
-        // });
-
-        let cursor: string | null = null;
-        const BATCH_SIZE = 100;
-        const limit = pLimit(2);
-
-        while (true) {
-
-            // Implemented cursor pagination to avoid loading all products in memory at once.....
-            // Hehehe... recently learned about this
-
-
-            const products: any[] = await db.mfProduct.findMany({
-                take: BATCH_SIZE,
-                skip: cursor ? 1 : 0,
-                cursor: cursor ? { id: cursor } : undefined,
-                select: { id: true, mapping_code: true },
-                orderBy: { id: 'asc' }
-            });
-
-            if (products.length === 0) break;
-
-            const tasks = products.map(product =>
-                limit(() => this.process_nav_history(product, startDate, endDate))
-            );
-
-            await Promise.allSettled(tasks);
-
-            cursor = products[products.length - 1].id;
+        const isin_to_code = new Map<string, number>();
+        for (const row of master) {
+            if (!row?.schemeCode) continue;
+            if (row.isinGrowth) isin_to_code.set(row.isinGrowth.trim().toUpperCase(), row.schemeCode);
+            if (row.isinDivReinvestment) isin_to_code.set(row.isinDivReinvestment.trim().toUpperCase(), row.schemeCode);
         }
-    }
+        logger.info(`mfapi isin map built: ${isin_to_code.size} ISINs across ${master.length} schemes`);
 
+        const products = await db.mfProduct.findMany({ select: { id: true, isin: true, scheme_code: true } });
 
+        logger.debug(`Total products to updates scheme code --> ${products.length}`)
 
+        let matched = 0;
+        let unchanged = 0;
+        const unmatched: string[] = [];
 
-    process_nav_history = async (product: { id: string, mapping_code: string }, startDate: string, endDate: string) => {
-        try {
-            const nav_history_data = await axios.get(`${process.env.MF_LATEST_URL}/mf/${product.mapping_code}`, {
-                params: { startDate, endDate },
-                timeout: 15000
-            }).then(res => res.data.data);
+        for (const product of products) {
+            const code = isin_to_code.get(product.isin.trim().toUpperCase());
 
-            logger.debug(`Fetched NAV history for scheme_id: ${product.mapping_code}, Records: ${nav_history_data.length}`);
-
-            const to_insert: MfNavHistoryCreateManyInput[] = nav_history_data.map((nav_record: any) => {
-                let parsedDate: Date;
-                if (typeof nav_record.date === 'string' && nav_record.date.includes('-')) {
-                    const parts = nav_record.date.split('-');
-                    if (parts.length === 3 && parts[0].length === 2) {
-                        parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                    } else {
-                        parsedDate = new Date(nav_record.date);
-                    }
-                } else {
-                    parsedDate = new Date(nav_record.date);
-                }
-
-                if (isNaN(parsedDate.getTime())) {
-                    logger.error(`Skipping ${product.mapping_code}: Invalid date format "${nav_record.date}"`);
-                }
-
-                return {
-                    mf_product_id: product.id,
-                    scheme_id: product.mapping_code,
-                    nav_date: parsedDate,
-                    nav: nav_record.nav,
-                } satisfies MfNavHistoryCreateManyInput;
-            });
-
-            if (to_insert.length > 0) {
-                const BATCH_SIZE = 1000;
-                for (let i = 0; i < to_insert.length; i += BATCH_SIZE) {
-                    await db.mfNavHistory.createMany({
-                        data: to_insert.slice(i, i + BATCH_SIZE),
-                        skipDuplicates: true
-                    });
-                }
+            if (!code) {
+                unmatched.push(product.isin);
+                continue;
+            }
+            if (product.scheme_code === code) {
+                unchanged++;
+                continue;
             }
 
-            logger.info(`NAV History Job: Inserted ${to_insert.length} records for scheme_id: ${product.mapping_code}`);
-        } catch (error) {
-            logger.error(`Error fetching/storing NAV history for scheme_id: ${product.mapping_code}`, error);
+            await db.mfProduct.update({ where: { id: product.id }, data: { scheme_code: code } });
+            matched++;
         }
+
+        logger.info(`Scheme code sync done - updated: ${matched}, already correct: ${unchanged}, unmatched: ${unmatched.length}`);
+        if (unmatched.length > 0) {
+            logger.warn(`ISINs with no mfapi match: ${unmatched.join(", ")}`);
+        }
+
+        return { total: products.length, matched, unchanged, unmatched_count: unmatched.length, unmatched };
     }
 
-
-
-
-
-
-    single_nav_history_job = async (scheme_code: string) => {
-
-        // const scheme_id: any = await this.get_only_mf_product(scheme_code).then(product => product?.mapping_code);
-
-        const endDate = (new Date()).toISOString().split('T')[0];
-        const startDate = (new Date(new Date().setFullYear(new Date().getFullYear() - 5))).toISOString().split('T')[0];
-
-        logger.debug(`Single NAV History Job: startDate=${startDate} endDate=${endDate}`);
-
-        const mf_product = await db.mfProduct.findFirst({
-            where: { id: scheme_code },
-            select: { id: true, scheme_id: true, mapping_code: true }
+    /**
+     * Stage 3: pull the latest NAV for every fund that has a scheme_code.
+     *
+     * Writes both MfProduct.latest_nav/latest_nav_date (what mf-metrics-calc anchors on) and an
+     * MfNavHistory row. The history insert relies on @@unique([mf_product_id, nav_date]) to make a
+     * same-day re-run a no-op rather than a duplicate.
+     *
+     * One HTTP call per fund - mfapi has no bulk latest-NAV endpoint - so concurrency is capped.
+     * A fund that fails is collected and reported, never aborts the batch.
+     */
+    mf_nav_daily_job = async () => {
+        const products = await db.mfProduct.findMany({
+            where: { scheme_code: { not: null } },
+            select: { id: true, isin: true, scheme_code: true },
         });
 
-        if (!mf_product) {
-            logger.warn(`Single NAV History Job: No product found for id: ${scheme_code}`);
-            return;
+        logger.info(`Starting NAV refresh for ${products.length} funds with a scheme_code`);
+
+        const limit = pLimit(5);
+        let updated = 0;
+        let history_inserted = 0;
+        const failed: { isin: string; reason: string }[] = [];
+
+        const tasks = products.map(product => limit(async () => {
+            const response = await mfapi_service.get_latest_nav(product.scheme_code!);
+
+            const point = response?.data?.[0];
+            if (!point?.nav || !point?.date) {
+                failed.push({ isin: product.isin, reason: "no NAV data in response" });
+                return;
+            }
+
+            const nav_date = this.parse_mfapi_date(point.date);
+            if (!nav_date) {
+                failed.push({ isin: product.isin, reason: `unparseable date "${point.date}"` });
+                return;
+            }
+
+            const nav = parseFloat(point.nav);
+            if (isNaN(nav)) {
+                failed.push({ isin: product.isin, reason: `unparseable nav "${point.nav}"` });
+                return;
+            }
+
+            await db.mfProduct.update({
+                where: { id: product.id },
+                data: { latest_nav: nav, latest_nav_date: nav_date },
+            });
+            updated++;
+
+            // createMany + skipDuplicates so re-running the same day is a no-op on the unique
+            // (mf_product_id, nav_date) pair instead of throwing.
+            const inserted = await db.mfNavHistory.createMany({
+                data: [{ mf_product_id: product.id, nav, nav_date }],
+                skipDuplicates: true,
+            });
+            history_inserted += inserted.count;
+        }));
+
+        await Promise.allSettled(tasks);
+
+        logger.info(`NAV refresh done - updated: ${updated}, history rows added: ${history_inserted}, failed: ${failed.length}`);
+        if (failed.length > 0) {
+            logger.warn(`NAV fetch failures: ${failed.slice(0, 10).map(f => `${f.isin} (${f.reason})`).join(", ")}`);
         }
 
-        await this.process_nav_history(mf_product, startDate, endDate);
+        return { total: products.length, updated, history_inserted, failed_count: failed.length, failed };
     }
 
     calculate_all_mf_metrics = async () => {
@@ -650,6 +636,171 @@ class JobServiceClass {
         }
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * One-time-ish historical NAV backfill: pulls each fund's WHOLE NAV history from mfapi into
+     * MfNavHistory. mf_nav_daily_job only appends one point per day going forward, so without this
+     * seed the metrics job has nothing to look back at and every return_* stays null.
+     *
+     * Keyed off MfProduct.scheme_code (resolved by mf_scheme_code_sync_job) - funds without one
+     * are skipped, since there's nothing to call mfapi with.
+     *
+     * NOTE: this currently re-downloads history for every fund on each run. Fine while it's a
+     * pre-go-live seed; add a "skip funds that already have history" guard before making it
+     * routine, otherwise re-running to pick up newly-imported funds refetches the whole catalogue.
+     */
+    nav_history_job = async () => {
+        let cursor: string | null = null;
+        const BATCH_SIZE = 100;
+        const limit = pLimit(2); // whole-history payloads are heavy and mfapi is a free public API
+
+        let processed = 0;
+        let inserted_total = 0;
+
+        while (true) {
+            // Cursor pagination so the whole catalogue never sits in memory at once.
+            const products = await db.mfProduct.findMany({
+                take: BATCH_SIZE,
+                skip: cursor ? 1 : 0,
+                cursor: cursor ? { id: cursor } : undefined,
+                where: { scheme_code: { not: null } },
+                select: { id: true, isin: true, scheme_code: true },
+                orderBy: { id: "asc" },
+            });
+
+            if (products.length === 0) break;
+
+            const results = await Promise.allSettled(
+                products.map(product => limit(() => this.process_nav_history(product)))
+            );
+
+            for (const result of results) {
+                if (result.status === "fulfilled") inserted_total += result.value;
+            }
+            processed += products.length;
+            logger.info(`[NAV HISTORY] Processed ${processed} funds, ${inserted_total} points inserted so far`);
+
+            cursor = products[products.length - 1].id;
+        }
+
+        const result = { total: processed, points_inserted: inserted_total };
+        logger.info("[NAV HISTORY] Backfill completed", result);
+        return result;
+    }
+
+    /**
+     * Fetches and stores one fund's full NAV history. Returns how many rows were actually written -
+     * skipDuplicates means a re-run inserts 0 rather than throwing on the
+     * @@unique([mf_product_id, nav_date]) pair.
+     *
+     * Never throws: a fund that fails is logged and reported as 0 so it can't abort the batch.
+     */
+    process_nav_history = async (product: { id: string; isin: string; scheme_code: number | null }): Promise<number> => {
+        if (!product.scheme_code) return 0;
+
+        try {
+            const response = await mfapi_service.get_full_history(product.scheme_code);
+            const points = response?.data ?? [];
+
+            if (points.length === 0) {
+                logger.warn(`[NAV HISTORY] No history returned for ${product.isin} (scheme_code ${product.scheme_code})`);
+                return 0;
+            }
+
+            const to_insert = points.flatMap(point => {
+                const nav_date = this.parse_mfapi_date(point.date);
+                const nav = parseFloat(point.nav);
+
+                // Drop unparseable points rather than writing a bad row - mfapi occasionally
+                // carries blank NAVs on non-trading days.
+                if (!nav_date || isNaN(nav)) return [];
+                return [{ mf_product_id: product.id, nav, nav_date }];
+            });
+
+            let inserted = 0;
+            const CHUNK = 1000;
+            for (let i = 0; i < to_insert.length; i += CHUNK) {
+                const chunk = await db.mfNavHistory.createMany({
+                    data: to_insert.slice(i, i + CHUNK),
+                    skipDuplicates: true,
+                });
+                inserted += chunk.count;
+            }
+
+            logger.info(`[NAV HISTORY] ${product.isin}: ${inserted} new points (of ${to_insert.length} fetched)`);
+            return inserted;
+        } catch (error) {
+            logger.error(`[NAV HISTORY] Failed for ${product.isin} (scheme_code ${product.scheme_code})`, error);
+            return 0;
+        }
+    }
+
+
+    process_fd_rates = async (data: any) => {
+        try {
+
+            let successCount = 0;
+
+            for (const rate of data.rates) {
+                await db.fdInterestRate.upsert({
+                    where: {
+                        // Prisma auto-generates this compound key name based on your @@unique constraint
+                        fd_product_id_payout_frequency_tenure_label_customer_type: {
+                            fd_product_id: rate.fd_product_id,
+                            payout_frequency: rate.payout_frequency,
+                            tenure_label: rate.tenure_label,
+                            customer_type: rate.customer_type,
+                        }
+                    },
+                    update: {
+                        // If it exists, update the dynamic values
+                        interest_rate: rate.interest_rate,
+                        annualized_yield: rate.annualized_yield,
+                        is_default_selection: rate.is_default_selection,
+                        is_tax_saver: rate.is_tax_saver,
+                        last_updated_at: rate.last_updated_at,
+                    },
+                    create: {
+                        // If it does not exist, insert the whole record
+                        fd_product_id: rate.fd_product_id,
+                        payout_frequency: rate.payout_frequency,
+                        customer_type: rate.customer_type,
+                        tenure_days: rate.tenure_days,
+                        tenure_label: rate.tenure_label,
+                        interest_rate: rate.interest_rate,
+                        annualized_yield: rate.annualized_yield,
+                        is_default_selection: rate.is_default_selection,
+                        is_tax_saver: rate.is_tax_saver,
+                        last_updated_at: rate.last_updated_at,
+                        // You can choose to use Velvet's createdAt, or let Janta generate its own default
+                        createdAt: rate.createdAt
+                    }
+                });
+                successCount++;
+            }
+
+            logger.info(`Successfully synced ${successCount} FD rates!`);
+
+            return { success: true, success_count: successCount }
+
+        } catch (error) {
+            logger.error(`Something went wrong with process fd rate service`, error)
+            return { success: false, success_count: 0 }
+        }
+    }
 }
 
 export const job_service = new JobServiceClass();

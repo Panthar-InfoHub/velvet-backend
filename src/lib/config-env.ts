@@ -2,10 +2,69 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const env = {
+
+    // =====================  v2 ENVS ===================================
+
+    MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY!,
+    MSG91_TEMPLATE_ID: process.env.MSG91_TEMPLATE_ID!,
+    MSG91_BASE_URL: process.env.MSG91_BASE_URL!,
+
+    // MSG91 email API - same authkey as the SMS flow above, different endpoint + template.
+    // Sending domain and the OTP template have to be set up in the MSG91 panel first.
+    MSG91_EMAIL_URL: process.env.MSG91_EMAIL_URL || "https://control.msg91.com/api/v5/email/send",
+    MSG91_EMAIL_TEMPLATE_ID: process.env.MSG91_EMAIL_TEMPLATE_ID!,
+    MSG91_EMAIL_DOMAIN: process.env.MSG91_EMAIL_DOMAIN!,
+    MSG91_FROM_EMAIL: process.env.MSG91_FROM_EMAIL!,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // Shared secret for the dev-only admin routes (OTP-bypass login). No default on purpose -
+    // a hardcoded fallback would be a publicly known secret. Unset means admin routes reject
+    // everything, which is the safe direction to fail.
+    ADMIN_API_SECRET: process.env.ADMIN_API_SECRET,
+
+    // Cybrilla (POA / onboarding-KYC provider) - v2 Finnsys replacement
+    CYBRILLA_TOKEN_URL: process.env.CYBRILLA_TOKEN_URL!,
+    CYBRILLA_CLIENT_ID: process.env.CYBRILLA_CLIENT_ID!,
+    CYBRILLA_CLIENT_SECRET: process.env.CYBRILLA_CLIENT_SECRET!,
+    CYBRILLA_API_BASE_URL: process.env.CYBRILLA_API_BASE_URL!,
+    // Client-side redirect URLs (app deep link / web landing page) - NOT webhooks. Where the
+    // user's browser lands after finishing the DigiLocker / esign journey in the webview.
+    KYC_FORM_PROOF_CALLBACK_URL: process.env.KYC_FORM_PROOF_CALLBACK_URL!,
+    KYC_FORM_ESIGN_CALLBACK_URL: process.env.KYC_FORM_ESIGN_CALLBACK_URL!,
+
+    // Fintech Primitives / "Janta Nivesh" API (MF, bank account, file) - v2 Finnsys replacement
+    FINTECH_PRIMITIVE_TOKEN_URL: process.env.FINTECH_PRIMITIVE_TOKEN_URL!,
+    FINTECH_PRIMITIVE_CLIENT_ID: process.env.FINTECH_PRIMITIVE_CLIENT_ID!,
+    FINTECH_PRIMITIVE_CLIENT_SECRET: process.env.FINTECH_PRIMITIVE_CLIENT_SECRET!,
+    FINTECH_PRIMITIVE_API_BASE_URL: process.env.FINTECH_PRIMITIVE_API_BASE_URL!,
+    FINTECH_PRIMITIVE_TENANT_ID: process.env.FINTECH_PRIMITIVE_TENANT_ID!, // x-tenant-id header
+
+
+
+
+
+
+
+
+
+
     finsys_base_api: process.env.FINSYS_BASE_API!,
     ENVIRONMENT: process.env.ENVIRONMENT!,
     JWT_SECRET: process.env.JWT_SECRET!,
     MF_LATEST_URL: process.env.MF_LATEST_URL!,
+    MFAPI_BASE_URL: process.env.MFAPI_BASE_URL || "https://api.mfapi.in", // NAV source (scheme master + per-fund latest NAV)
     KYC_BASE_URL: process.env.KYC_BASE_URL!,
     ARN: process.env.ARN!,
     EUIN: process.env.EUIN!,

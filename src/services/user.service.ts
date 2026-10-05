@@ -1,5 +1,5 @@
 import axios from "axios";
-import { UserFireReportData, UserWithAllData } from "../lib/types.js";
+import { UserFireReportData, UserWithAllData, pagination } from "../lib/types.js";
 import {
     FdTransactionOrderByWithRelationInput,
     FdTransactionWhereInput,
@@ -12,9 +12,9 @@ import { user_assets_service } from "./onboarding/user.assets.service.js";
 import { user_insurance_service } from "./onboarding/user.insurance.service.js";
 import { user_loan_service } from "./onboarding/user.loan.service.js";
 import { user_goal_service } from "./onboarding/user.goal.service.js";
-import { pagination } from "./mutual-fund.service.js";
 import { hash_mpin, compare_mpin } from "../lib/utils.js";
 import { generate_JWT } from "../middleware/jwt.js";
+import AppError from "../middleware/error.middleware.js";
 
 
 type GetUserFdDataInput = {
@@ -33,6 +33,7 @@ type GetAllUserDataOptions = {
     user_bank_details?: boolean;
     kyc_types?: boolean;
     mfKycIdentities?: boolean;
+    onboarding?: boolean;
 }
 
 
@@ -76,14 +77,33 @@ class UserServiceClass {
 
     async patch_user(user_id: string, data: any) {
         if (data.mpin) {
+            // Setting a new pin always (re)activates it - covers first-time setup and changing
+            // an existing pin identically, no separate "change" path needed.
             data.mpin = await hash_mpin(data.mpin);
+            data.mpin_is_setup = true;
+            data.mpin_enabled = true;
+        } else if (typeof data.mpin_enabled === "boolean") {
+            const user = await db.user.findUnique({
+                where: { id: user_id },
+                select: { mpin_is_setup: true },
+            });
+
+            if (data.mpin_enabled && !user?.mpin_is_setup) {
+                throw new AppError(
+                    "Cannot enable pin login before a pin has been set",
+                    400,
+                    "MPIN_NOT_SETUP",
+                );
+            }
         }
+
         const updated_user = await db.user.update({
             where: { id: user_id },
             data: { ...data },
         });
-        delete updated_user.pwd;
         delete updated_user.mpin;
+        delete updated_user.email_hash;
+        delete updated_user.phone_hash;
         return updated_user;
     }
 
@@ -92,7 +112,9 @@ class UserServiceClass {
             where: { id: user_id },
         });
 
-        if (!user || !user.mpin) return {
+        // mpin_enabled also covers the case where a pin exists but the user switched it off -
+        // the hash would still match, but pin login shouldn't work while disabled.
+        if (!user || !user.mpin || !user.mpin_enabled) return {
             is_verified: false,
             token: "",
             refresh_token: ""
@@ -124,9 +146,15 @@ class UserServiceClass {
                         { updatedAt: 'desc' }
                     ]
                 },
-                mfKycIdentities: true,
+                // mfKycIdentities: true,
             }
         });
+    }
+
+    // Runs against ciphertext - extended-db rewrites the `email` filter to the `email_hash`
+    // blind index, so this is a real unique lookup and not a full scan.
+    async get_user_by_email(email: string) {
+        return await db.user.findUnique({ where: { email } });
     }
 
     get_user_by_refresh_token(refresh_token: string) {
@@ -140,7 +168,7 @@ class UserServiceClass {
     async get_user_by_invId(inv_id: number) {
         return await db.user.findUnique({
             where: {
-                inv_id: inv_id
+                id: inv_id.toString()
             }
         });
     }
@@ -157,7 +185,7 @@ class UserServiceClass {
     async get_user_by_usr(usr: string) {
         return await db.user.findUnique({
             where: {
-                usr: usr
+                id: usr
             }
         });
     }
@@ -172,7 +200,7 @@ class UserServiceClass {
     }
 
 
-    async get_user_fire_report_data(user_id: string): Promise<UserFireReportData | null> {
+    async get_user_fire_report_data(user_id: string) {
         return await db.user.findUnique({
             where: { id: user_id },
             include: {
@@ -190,13 +218,17 @@ class UserServiceClass {
                 },
                 user_insurance: true,
                 user_loan: true,
-                user_goals: true,
+                user_goals: {
+                    where: {
+                        status: { not: "DELETED" },
+                    },
+                },
             }
         });
     }
 
 
-    async get_all_user_data(user_id: string, options?: GetAllUserDataOptions): Promise<UserWithAllData | null> {
+    async get_all_user_data(user_id: string, options?: GetAllUserDataOptions) {
         const user = await db.user.findUnique({
             where: {
                 id: user_id
@@ -206,19 +238,26 @@ class UserServiceClass {
                 user_assets: options?.user_assets ?? false,
                 user_insurance: options?.user_insurance ?? false,
                 user_loan: options?.user_loan ?? false,
-                user_goals: options?.user_goals ?? false,
-                user_bank_details: options?.user_bank_details ?? false,
-                kyc_types: options?.kyc_types ? {
-                    select: {
-                        kyc_type: true,
-                        status: true,
+                user_goals: options?.user_goals
+                    ? {
+                        where: {
+                            status: { not: "DELETED" },
+                        },
+                        orderBy: { createdAt: "desc" },
                     }
-                } : false,
-                mfKycIdentities: options?.mfKycIdentities ?? false,
+                    : false,
+                user_bank_details: options?.user_bank_details ?? false,
+                onboarding: options?.onboarding ?? false,
+                // kyc_types: options?.kyc_types ? {
+                //     select: {
+                //         kyc_type: true,
+                //         status: true,
+                //     }
+                // } : false,
+                // mfKycIdentities: options?.mfKycIdentities ?? false,
             }
         });
 
-        delete user?.pwd;
         delete user?.mpin;
         return user
     }
@@ -424,6 +463,10 @@ class UserServiceClass {
                 ? Number(((total_returns / total_invested) * 100).toFixed(2))
                 : 0;
 
+        const mf_one_day_return = mf_investment_data?.one_day_return || 0;
+        const mf_one_day_return_percent = mf_investment_data?.one_day_return_percent || 0;
+        const mf_xirr = mf_investment_data?.xirr ?? null;
+
         return {
             total_investments: {
                 current_value: Number(total_current_value.toFixed(2)),
@@ -433,6 +476,12 @@ class UserServiceClass {
                     mutual_funds: {
                         value: Number(mf_current_value.toFixed(2)),
                         percent: mf_allocation_percent,
+                        invested_amount: Number(mf_invested_amount.toFixed(2)),
+                        total_returns: Number(mf_total_returns.toFixed(2)),
+                        return_percent: mf_return_percent,
+                        one_day_return: Number(mf_one_day_return.toFixed(2)),
+                        one_day_return_percent: Number(mf_one_day_return_percent.toFixed(2)),
+                        xirr: mf_xirr,
                     },
                     fixed_deposits: {
                         value: Number(fd_aggregates.current_value.toFixed(2)),
