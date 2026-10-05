@@ -47,6 +47,7 @@ import { migration_router } from "./routes/migration.router.js"
 import { report_router } from "./routes/report.router.js"
 import { extendPrismaClient } from "./lib/extended-db.js"
 import { test_router } from "./routes/test.router.js"
+import { shutdown_posthog } from "./lib/posthog.js"
 
 //Configurations
 dotenv.config()
@@ -147,8 +148,13 @@ const server = app.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-const shutdown = (signal: any) => {
+const shutdown = async (signal: any) => {
     logger.warn(`${signal} received. Shutting down gracefully...`);
+    try {
+        await shutdown_posthog();
+    } catch (err) {
+        logger.error("Error flushing PostHog during shutdown:", err);
+    }
     server.close(() => {
         logger.info("HTTP server closed.");
         process.exit(0);
