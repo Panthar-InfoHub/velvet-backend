@@ -48,8 +48,12 @@ class InsuranceOnboardingControllerClass {
                 },
             );
 
+            await user_onboarding_service.recompute_completion(
+                user.id,
+            );
+
             const onboarding =
-                await user_onboarding_service.recompute_completion(
+                await user_onboarding_service.get_status_summary(
                     user.id,
                 );
 

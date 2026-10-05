@@ -50,10 +50,16 @@ class FinanceOnboardingControllerClass {
                 user.id,
             );
 
+            const onboarding =
+                await user_onboarding_service.get_status_summary(
+                    user.id,
+                );
+
             res.status(200).json({
                 success: true,
                 message: "Financial details saved successfully",
                 data: finance,
+                onboarding,
             });
         } catch (error) {
             next(error);

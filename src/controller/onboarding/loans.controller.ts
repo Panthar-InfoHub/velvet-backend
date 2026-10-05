@@ -21,8 +21,12 @@ class LoansOnboardingControllerClass {
                 );
             }
 
+            const loans_data = Array.isArray(req.body)
+                ? req.body
+                : req.body?.loans ?? req.body;
+
             const validation_result =
-                onboarding_loans_schema.safeParse(req.body);
+                onboarding_loans_schema.safeParse(loans_data);
 
             if (!validation_result.success) {
                 throw new AppError(
@@ -49,10 +53,16 @@ class LoansOnboardingControllerClass {
                 user.id,
             );
 
+            const onboarding =
+                await user_onboarding_service.get_status_summary(
+                    user.id,
+                );
+
             res.status(200).json({
                 success: true,
                 message: "Loan details saved successfully",
                 data: validation_result.data,
+                onboarding,
             });
         } catch (error) {
             next(error);

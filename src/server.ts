@@ -81,6 +81,10 @@ app.use("/api/v2/onboarding/penny-drop", penny_drop_router)
 app.use("/api/v2/onboarding/email", email_verification_router)
 app.use("/api/v2/onboarding/investor-profile", investor_profile_router)
 app.use("/api/v2/onboarding/nominee", nominee_router)
+app.use("/api/v2/onboarding/finance", finance_router);
+app.use("/api/v2/onboarding/assets", assets_router);
+app.use("/api/v2/onboarding/loans", loans_router);
+app.use("/api/v2/onboarding/insurance", insurance_router);
 app.use("/api/v2/mandate", mandate_router)
 app.use("/api/v2/webhook/mandate", mandate_webhook_router)
 app.use("/api/v2/webhook/fp", fp_webhook_router)
@@ -116,10 +120,6 @@ app.use("/api/v1/user-assets", user_assets_router)
 app.use("/api/v1/user-finance", user_finance_router)
 app.use("/api/v1/user-loan", user_loan_router)
 app.use("/api/v1/user-insurance", user_insurance_router)
-app.use("/api/v2/onboarding/finance", finance_router);
-app.use("/api/v2/onboarding/assets", assets_router);
-app.use("/api/v2/onboarding/loans", loans_router);
-app.use("/api/v2/onboarding/insurance", insurance_router);
 app.use("/api/v1/user-goal", user_goal_router)
 app.use("/api/v1/fire-report", fire_report_router)
 app.use("/api/v1/report", report_router)
