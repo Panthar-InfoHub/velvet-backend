@@ -475,8 +475,8 @@ class FireReportServiceClass {
         ): { sip: number; corpus: number } {
             const current_year = new Date().getFullYear();
 
-            // ── Retirement (goal_type_id === 3) ──────────────────────────────────
-            if (goal.goal_type_id === 3) {
+            // ── Retirement ──────────────────────────────────
+            if (goal.category === "Retirement") {
                 if (!dob) return { sip: 0, corpus: 0 };
 
                 const birth_year = new Date(dob).getFullYear();
@@ -527,12 +527,15 @@ class FireReportServiceClass {
                 return { sip: isFinite(sip) ? sip : 0, corpus: Math.round(retirement_corpus) };
             }
 
-            // ── Non-retirement (types 1, 2, 4) ───────────────────────────────────
+            // ── Non-retirement (types 1, 2, 3, 4, 5, 6, etc.) ───────────────────────
             // Formula: numerator / (11 × 12 × denominator) from FireReport.tsx
             const years_to_goal = goal.target_year - current_year;
+            if (years_to_goal <= 0) return { sip: 0, corpus: Math.round(goal.target_amount) };
             const denominator = Math.pow(1 + FIRE_CONSTANTS.goal_sip_return, years_to_goal) - 1; // (1.1^n - 1)
             if (denominator === 0) return { sip: 0, corpus: 0 };
-            const numerator = goal.target_amount * Math.pow(1 + FIRE_CONSTANTS.goal_fv_growth, years_to_goal); // target × 1.08^n
+            const numerator = (goal.future_value && goal.future_value > 0)
+                ? goal.future_value
+                : goal.target_amount * Math.pow(1 + FIRE_CONSTANTS.goal_fv_growth, years_to_goal); // target × 1.08^n
             const value = numerator / (11 * 12 * denominator);
             const sip = isFinite(value) ? Math.round(value) : 0;
             return { sip, corpus: Math.round(numerator) };
@@ -546,8 +549,12 @@ class FireReportServiceClass {
             year: number,
         ): number | null {
             // Retirement goals have no lump-sum payout — covered by SIP
-            if (goal.goal_type_id === 3) return null;
+            if (goal.category === "Retirement") return null;
             if (year !== goal.target_year) return null;
+
+            if (goal.future_value && goal.future_value > 0) {
+                return goal.future_value;
+            }
 
             const years_to_goal = goal.target_year - current_year;
             if (years_to_goal <= 0) return goal.target_amount;
@@ -556,8 +563,12 @@ class FireReportServiceClass {
 
         // Helpers
 
-        private to_num(val: Prisma.Decimal | null | undefined): number {
-            return val?.toNumber() ?? 0;
+        private to_num(val: Prisma.Decimal | string | number | null | undefined): number {
+            if (val == null) return 0;
+            if (typeof val === "number") return isNaN(val) ? 0 : val;
+            if (typeof (val as any).toNumber === "function") return (val as any).toNumber();
+            const n = Number(val);
+            return isNaN(n) ? 0 : n;
         }
 
         private extract_age(dob: Date | null): number {
@@ -773,66 +784,78 @@ class FireReportServiceClass {
             const label_map: Record<number, string> = {
                 1: "Child Education",
                 2: "Child Marriage",
-                3: "Retirement",
-                4: "Wealth Goal",
+                3: "Buy a Home",
+                4: "Buy a Vehicle",
+                5: "Build My Savings",
+                6: "Other Goal",
             };
 
             const normalized: NormalizedGoalWithSIP[] = [];
 
             for (const g of goals) {
-                // ── Type 3: Retirement ─────
-                if (g.goal_type_id === 3) {
-                    // Need dob + retirement_age to derive target_year
-                    if (birth_year === null || g.retirement_age == null) continue;
-                    const target_year = birth_year + g.retirement_age;
+                // If the goal is marked DELETED or CANCELLED, skip it
+                if (g.status && (g.status === "DELETED" || g.status === "CANCELLED")) {
+                    continue;
+                }
+
+                // Check for legacy retirement goal (explicit retirement_age)
+                if ((g as any).retirement_age != null) {
+                    if (birth_year === null) continue;
+                    const target_year = birth_year + (g as any).retirement_age;
                     if (target_year <= current_year) continue;
 
                     const entry: NormalizedGoalWithSIP = {
                         id: g.id,
-                        name: "Retirement Fund",
+                        name: g.goal_name || "Retirement Fund",
                         category: "Retirement",
                         target_year,
                         target_amount: 0,
-                        life_expectancy: g.life_expectancy ?? null,
-                        current_monthly_exp: g.current_monthly_expense
-                            ? this.to_num(g.current_monthly_expense)
+                        life_expectancy: (g as any).life_expectancy ?? null,
+                        current_monthly_exp: (g as any).current_monthly_expense
+                            ? this.to_num((g as any).current_monthly_expense)
                             : null,
                         required_monthly_sip: 0,
                         future_value: 0,
-                        goal_type_id: 3,
+                        goal_type_id: g.goal_type_id ?? 0,
                     };
                     const { sip: ret_sip, corpus: ret_corpus } = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
-                    entry.required_monthly_sip = ret_sip;
-                    entry.future_value = ret_corpus;
+                    entry.required_monthly_sip = Math.round(this.to_num(g.required_monthly_sip) || ret_sip);
+                    entry.future_value = Math.round(this.to_num(g.future_target_amount) || ret_corpus);
                     normalized.push(entry);
                     continue;
                 }
 
-                // ── Types 1, 2, 4: Standard goals ────────────────────────────────
-                if (g.years_left == null || g.years_left <= 0) continue;
-                if (g.current_goal_cost == null) continue;
+                // Standard v2 goals
+                const years_left = g.years_remaining ?? (g as any).years_left;
+                if (years_left == null || years_left <= 0) continue;
 
-                const target_year = current_year + g.years_left;
-                const name =
-                    g.goal_type_id === 4
-                        ? (g.goal_item_name ?? g.goal_name ?? label_map[4])
-                        : label_map[g.goal_type_id] ?? "Financial Goal";
+                const target_year = current_year + years_left;
+                const category = label_map[g.goal_type_id] ?? "Goal";
+                const name = g.goal_name || (g as any).goal_item_name || category;
+                const cost = this.to_num(g.current_cost ?? g.target_amount ?? (g as any).current_goal_cost);
+                let stored_fv = Math.round(this.to_num(g.future_target_amount ?? g.net_required_corpus));
+                let stored_sip = Math.round(this.to_num(g.required_monthly_sip));
 
                 const entry: NormalizedGoalWithSIP = {
                     id: g.id,
                     name,
-                    category: label_map[g.goal_type_id] ?? "Goal",
+                    category,
                     target_year,
-                    target_amount: this.to_num(g.current_goal_cost),
+                    target_amount: cost,
                     life_expectancy: null,
                     current_monthly_exp: null,
-                    required_monthly_sip: 0,
-                    future_value: 0,
+                    required_monthly_sip: stored_sip,
+                    future_value: stored_fv,
                     goal_type_id: g.goal_type_id,
                 };
-                const { sip, corpus } = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
-                entry.required_monthly_sip = sip;
-                entry.future_value = corpus;
+
+                // Fallback computation if SIP or future value wasn't snapshot in DB
+                if (entry.required_monthly_sip === 0 || entry.future_value === 0) {
+                    const { sip, corpus } = this.calculate_goal_sip(entry, dob, monthly_expenses_total);
+                    if (entry.required_monthly_sip === 0) entry.required_monthly_sip = sip;
+                    if (entry.future_value === 0) entry.future_value = corpus;
+                }
+
                 normalized.push(entry);
             }
 

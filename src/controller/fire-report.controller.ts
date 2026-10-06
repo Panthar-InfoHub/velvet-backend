@@ -6,10 +6,12 @@ import logger from "../middleware/logger.js";
 import { fire_report_service } from "../services/fire.report.service.js";
 import { zoho_webhook_service } from "../services/zoho.webhook.service.js";
 
+import fs from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
 const execPromise = promisify(exec);
+let hasCheckedChrome = false;
 
 export const fire_report_controller = {
     async get_fire_report(req: Request, res: Response, next: NextFunction) {
@@ -80,12 +82,14 @@ export const fire_report_controller = {
 
 
 async function checkChromeDependencies() {
-    // Path to the bundled chrome binary in your .cache folder
-    // Note: The version number might change if puppeteer updates,
-    // so we use a wildcard or the specific one from your logs.
-    const chromePath = "/workspace/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome"
+    if (hasCheckedChrome) return;
+    const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || "/workspace/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome";
 
     try {
+        if (!fs.existsSync(chromePath)) {
+            hasCheckedChrome = true;
+            return;
+        }
         logger.info("Starting dependency check for Chrome...");
         // ldd lists all shared library dependencies and their status
         const { stdout, stderr } = await execPromise(`ldd ${chromePath}`);
@@ -103,6 +107,8 @@ async function checkChromeDependencies() {
             logger.info("✅ All Chrome shared libraries are present.");
         }
     } catch (error) {
-        logger.error(`Could not run dependency check: ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn(`Could not run dependency check: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+        hasCheckedChrome = true;
     }
 }
