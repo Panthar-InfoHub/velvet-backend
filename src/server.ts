@@ -28,21 +28,26 @@ import { mf_scheme_router } from "./routes/mf-scheme.router.js"
 // mutual_fund_router (v1 Finnsys catalogue) retired as part of the Cybrilla/FP migration - the
 // controller/router and their dedicated services are excluded from the build (tsconfig.json).
 // import { mutual_fund_router } from "./routes/mutual-fund.router.js"
-import { onboarding_router } from "./routes/onboarding.router.js"
 import { user_assets_router } from "./routes/user/user.assets.router.js"
 import { user_finance_router } from "./routes/user/user.finance.router.js"
 import { user_goal_router } from "./routes/user/user.goal.router.js"
 import { user_insurance_router } from "./routes/user/user.insurance.router.js"
 import { user_loan_router } from "./routes/user/user.loan.router.js"
 import { user_router } from "./routes/user/user.router.js"
+import { finance_router } from "./routes/onboarding_routers/finance.router.js";
+import { assets_router } from "./routes/onboarding_routers/assets.router.js";
+import { loans_router } from "./routes/onboarding_routers/loans.router.js";
+import { insurance_router } from "./routes/onboarding_routers/insurance.router.js";
 import { fd_router } from "./routes/fd.router.js"
 import { webhook_router as fd_webhook_router } from "./routes/webhook.validation.router.js"
 import { bundle_router } from "./routes/bundle.router.js"
+import { payment_router } from "./routes/payment.router.js"
 import { frontend_router } from "./routes/frontend.router.js"
 import { migration_router } from "./routes/migration.router.js"
 import { report_router } from "./routes/report.router.js"
 import { extendPrismaClient } from "./lib/extended-db.js"
 import { test_router } from "./routes/test.router.js"
+import { shutdown_posthog } from "./lib/posthog.js"
 
 //Configurations
 dotenv.config()
@@ -77,6 +82,10 @@ app.use("/api/v2/onboarding/penny-drop", penny_drop_router)
 app.use("/api/v2/onboarding/email", email_verification_router)
 app.use("/api/v2/onboarding/investor-profile", investor_profile_router)
 app.use("/api/v2/onboarding/nominee", nominee_router)
+app.use("/api/v2/onboarding/finance", finance_router);
+app.use("/api/v2/onboarding/assets", assets_router);
+app.use("/api/v2/onboarding/loans", loans_router);
+app.use("/api/v2/onboarding/insurance", insurance_router);
 app.use("/api/v2/mandate", mandate_router)
 app.use("/api/v2/webhook/mandate", mandate_webhook_router)
 app.use("/api/v2/webhook/fp", fp_webhook_router)
@@ -89,6 +98,7 @@ app.use("/api/v2/user", user_router)
 app.use("/api/v2/user-goal", user_goal_router)
 app.use("/api/v2/report", report_router)
 app.use("/api/v2/bundles", bundle_router)
+app.use("/api/v2/payment", payment_router)
 
 
 // Admin/internal-ops routes. Mounted unconditionally - each route decides its own restriction
@@ -107,7 +117,6 @@ app.use("/api/v1/fd", fd_router)
 app.use("/api/v1/test", test_router)
 app.use("/api/v1/fd/webhook", fd_webhook_router)
 // app.use("/api/v1/mf", mutual_fund_router) // retired - see the import comment above
-app.use("/api/v1/onboarding", onboarding_router)
 app.use("/api/v1/user-assets", user_assets_router)
 app.use("/api/v1/user-finance", user_finance_router)
 app.use("/api/v1/user-loan", user_loan_router)
@@ -139,8 +148,13 @@ const server = app.listen(PORT, async () => {
 });
 
 // Graceful shutdown
-const shutdown = (signal: any) => {
+const shutdown = async (signal: any) => {
     logger.warn(`${signal} received. Shutting down gracefully...`);
+    try {
+        await shutdown_posthog();
+    } catch (err) {
+        logger.error("Error flushing PostHog during shutdown:", err);
+    }
     server.close(() => {
         logger.info("HTTP server closed.");
         process.exit(0);
