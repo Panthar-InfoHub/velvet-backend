@@ -108,14 +108,16 @@ class UserOnboardingServiceClass {
                 email: onboarding.email_status,
                 profile: onboarding.profile_status,
                 nominee: onboarding.nominee_status,
+            },
 
+            fire_stages: {
                 // Velvet financial stages
                 finance: onboarding.finance_status,
                 assets: onboarding.assets_status,
                 loan: onboarding.loan_status,
                 insurance: onboarding.insurance_status,
                 goals: onboarding.goals_status,
-            },
+            }
         };
     };
 }
