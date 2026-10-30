@@ -4,7 +4,7 @@ name : Staging & Prod Pipeline
 on:
   push:
     branches:
-      - stagging_v2
+      - staging_v2
 
 # Permissions : Push to branch and create PRs
 
