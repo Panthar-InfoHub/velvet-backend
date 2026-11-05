@@ -1,0 +1,282 @@
+[
+    {
+        "amc_id": 1,
+        "amc_name": "AXIS ASSET MANAGEMENT COMPANY LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125756/AXIS_Mutual_Fund_fbgbut.png"
+    },
+    {
+        "amc_id": 3,
+        "amc_name": "BIRLA SUN LIFE MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125755/Aditya_Birla_Mutual_Fund_pabx69.png"
+    },
+    {
+        "amc_id": 4,
+        "amc_name": "BARODA BNP PARIBAS MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125759/Baroda_BNP_Paribas_Mutual_Fund_vglesv.png"
+    },
+    {
+        "amc_id": 5,
+        "amc_name": "BANK OF INDIA MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Bank_of_India_Mutual_Fund_ckz5w1.png"
+    },
+    {
+        "amc_id": 6,
+        "amc_name": "CANARA ROBECO ASSET MANAGEMENT COMPANY LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125759/Canara_Robeco_Mutual_Fund_ldbhqr.png"
+    },
+    {
+        "amc_id": 7,
+        "amc_name": "PGIM INDIA MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/PGIM_India_Mutual_Fund_g9epcf.png"
+    },
+    {
+        "amc_id": 8,
+        "amc_name": "DSP BLACKROCK INVESTMENT MANAGERS LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/DSP_Mutual_Fund_sshss6.png"
+    },
+    {
+        "amc_id": 9,
+        "amc_name": "EDELWEISS ASSET MANAGEMENT LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/Edelweiss_Mutual_Fund_vqc2cg.png"
+    },
+    {
+        "amc_id": 11,
+        "amc_name": "FRANKLIN TEMPLETON ASSET MANAGEMENT (INDIA) PVT. LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/Franklin_Templeton_Mutual_Fund_v6fs3l.png"
+    },
+    {
+        "amc_id": 13,
+        "amc_name": "HDFC AMC LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/HDFC_Mutual_Fund_qii9rt.png"
+    },
+    {
+        "amc_id": 14,
+        "amc_name": "HSBC ASSET MANAGEMENT (INDIA) PVT. LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125755/HSBC_Mutual_Fund_bk5sjw.png"
+    },
+    {
+        "amc_id": 15,
+        "amc_name": "ICICI PRUDENTIAL ASSET MANAGEMENT COMPANY LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125755/ICICI_Prudential_Mutual_Fund_unq5yv.png"
+    },
+    {
+        "amc_id": 16,
+        "amc_name": "IDBI ASSET MANAGEMENT SERVICES LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/IDBI_MF_cvizid.png"
+    },
+    {
+        "amc_id": 17,
+        "amc_name": "Bandhan Mutual Fund.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125757/Bandhan_Mutual_Fund_rfmdai.png"
+    },
+    {
+        "amc_id": 18,
+        "amc_name": "GROWW MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125761/Groww_Mutual_Fund_c0cdwq.png"
+    },
+    {
+        "amc_id": 20,
+        "amc_name": "JM FINANCIAL ASSET MANAGEMENT LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125756/JM_Financial_Mutual_Fund_dby1eq.png"
+    },
+    {
+        "amc_id": 21,
+        "amc_name": "KOTAK AMC LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125757/Kotak_Mahindra_Mutual_Fund_fwises.png"
+    },
+    {
+        "amc_id": 22,
+        "amc_name": "L&T INVESTMENT MANAGEMENT LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/L_T_MF_l9p7xo.png"
+    },
+    {
+        "amc_id": 23,
+        "amc_name": "LIC NOMURA MUTUAL FUND ASSET MANAGEMENT CO.LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125757/LIC_Mutual_Fund_xc0adq.png"
+    },
+    {
+        "amc_id": 24,
+        "amc_name": "MIRAE ASSET GLOBAL INVESTMENTS (INDIA) PVT. LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Mirae_Mutual_Fund_cdre41.png"
+    },
+    {
+        "amc_id": 25,
+        "amc_name": "MOTILAL OSWAL ASSET MANAGEMENT COMPANY LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Motilal_Oswal_Mutual_Fund_bs3rjx.png"
+    },
+    {
+        "amc_id": 27,
+        "amc_name": "PPFAS ASSET MANAGEMENT PVT. LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/PPFAS_MUTUAL_FUND_aytbck.png"
+    },
+    {
+        "amc_id": 29,
+        "amc_name": "QUANTUM ASSET MANAGEMENT COMPANY PRIVATE LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125761/Quantum_Mutual_Fund_cagx6c.png"
+    },
+    {
+        "amc_id": 30,
+        "amc_name": "Nippon India Mutual Fund",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Nippon_India_Mutual_Fund_gftrdg.png"
+    },
+    {
+        "amc_id": 31,
+        "amc_name": "INVESCO ASSET MANAGEMENT COMPANY PRIVATE LIMITED",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125756/Invesco_Mutual_Fund_lishm2.png"
+    },
+    {
+        "amc_id": 33,
+        "amc_name": "SBI MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125761/SBI_Mutual_Fund_l68ayr.png"
+    },
+    {
+        "amc_id": 34,
+        "amc_name": "SHRIRAM MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125761/SHRIRAM_MUTUAL_FUND_kpnoeg.png"
+    },
+    {
+        "amc_id": 35,
+        "amc_name": "SUNDARAM MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/Sundaram_Mutual_Fund_r3sgjx.png"
+    },
+    {
+        "amc_id": 36,
+        "amc_name": "TATA ASSET MANAGEMENT LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/TATA_Mutual_Fund_f1ntcb.png"
+    },
+    {
+        "amc_id": 37,
+        "amc_name": "TAURUS ASSET MANAGEMENT CO. LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/Taurus_Mutual_Fund_kz4s1u.png"
+    },
+    {
+        "amc_id": 38,
+        "amc_name": "UNION KBC ASSET MANAGEMENT CO PVT LTD",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125763/UNION_KBC_MUTUAL_FUND_nrefzo.png"
+    },
+    {
+        "amc_id": 39,
+        "amc_name": "UTI ASSET MANAGEMENT COMPANY LTD.",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125764/UTI_Mutual_Fund_qcrla6.png"
+    },
+    {
+        "amc_id": 40,
+        "amc_name": "MAHINDRA MANULIFE MUTUAL FUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Mahindra_Manulife_Mutual_Fund_akdeyx.png"
+    },
+    {
+        "amc_id": 41,
+        "amc_name": "NAVI MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125758/Navi_Mutual_Fund_inrpyw.png"
+    },
+    {
+        "amc_id": 42,
+        "amc_name": "360_ONE_MUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125755/360_One_Mutual_Fund_tmkcru.png"
+    },
+    {
+        "amc_id": 43,
+        "amc_name": "ITI MUTUAL FUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125756/ITI_Mutual_Fund_rlyrtw.png"
+    },
+    {
+        "amc_id": 44,
+        "amc_name": "QUANTMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/Quant_Mutual_Fund_b52z4m.png"
+    },
+    {
+        "amc_id": 45,
+        "amc_name": "TRUSTMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125763/TRUST_Mutual_Fund_bgn6ul.png"
+    },
+    {
+        "amc_id": 46,
+        "amc_name": "WHITEOAKCAPITALMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125763/White_Oak_Capital_Mutual_Fund_ukzonp.png"
+    },
+    {
+        "amc_id": 47,
+        "amc_name": "NJMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125759/NJ_Mutual_Fund_dpnee9.png"
+    },
+    {
+        "amc_id": 48,
+        "amc_name": "SAMCOMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125761/SAMCO_Mutual_Fund_sqysyv.png"
+    },
+    {
+        "amc_id": 49,
+        "amc_name": "BAJAJ FINSERV_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125757/Bajaj_Finserv_Mutual_Fund_rflolb.png"
+    },
+    {
+        "amc_id": 50,
+        "amc_name": "HELIOSMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/Helios_Mutual_Fund_vkdewe.png"
+    },
+    {
+        "amc_id": 51,
+        "amc_name": "ZERODHAMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/Zerodha_MF_ptzodr.png"
+    },
+    {
+        "amc_id": 52,
+        "amc_name": "OLD BRIDGE MUTUAL FUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125759/Old_Bridge_Mutual_Fund_oka3ip.png"
+    },
+    {
+        "amc_id": 53,
+        "amc_name": "ANGELONE MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125756/Angel_One_Mutual_Fund_iqsuls.png"
+    },
+    {
+        "amc_id": 54,
+        "amc_name": "UNIFI MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125763/Unifi_Mutual_Fund_ennzan.png"
+    },
+    {
+        "amc_id": 55,
+        "amc_name": "JIOBLACKROCKMUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/JIO_BLACKROCK_MF_vpteon.png"
+    },
+    {
+        "amc_id": 56,
+        "amc_name": "CAPITALMIND MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125759/Capitalmind_Mutual_Fund_ox8y6s.png"
+    },
+    {
+        "amc_id": 57,
+        "amc_name": "Wealth Company Mutual Fund",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125762/The_Wealth_Company_Mutual_Fund_zeddyz.png"
+    },
+    {
+        "amc_id": 58,
+        "amc_name": "EDELWEISSMUTUALFUNDSIF_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/Edelweiss_Mutual_Fund_vqc2cg.png"
+    },
+    {
+        "amc_id": 59,
+        "amc_name": "CHOICE MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/CHOICE_MF_LOGO_fqz7wh.png"
+    },
+    {
+        "amc_id": 60,
+        "amc_name": "ABAKKUS MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125755/Abakkus_Mutual_Fund_ufdtqc.png"
+    },
+    {
+        "amc_id": 61,
+        "amc_name": "QUANTMUTUALFUND_MF_SIF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1779125760/Quant_Mutual_Fund_b52z4m.png"
+    },
+    {
+        "amc_id": 62,
+        "amc_name": "ALPHAGREP MUTUALFUND",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/Alphareg_MF_LOGO_ki4ssb.png"
+    },
+    {
+        "amc_id": 63,
+        "amc_name": "ASK MUTUALFUND_MF",
+        "img": "https://res.cloudinary.com/djufv2qnd/image/upload/v1788626218/ASK_MF_LOGO_bjmv4l.png"
+    }
+]

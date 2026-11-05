@@ -4,8 +4,12 @@
   "main": "dist/server.js ",
   "type": "module",
   "scripts": {
-    "build": "tsc && cp -r src/lib/fonts dist/lib/",
+    "build": "tsc && cp -r src/lib/fonts dist/lib/ && mkdir -p dist/lib/jn-report/assets && cp src/assets/reports/janta-nivesh-logo.png dist/lib/jn-report/assets/janta-nivesh-logo.png",
     "dev": "nodemon --watch src --ext ts --exec \"npm run build && node ./dist/server.js\"",
+    "dev:dev": "APP_ENV=dev nodemon --watch src --ext ts --exec \"npm run build && APP_ENV=dev node ./dist/server.js\"",
+    "dev:prod": "APP_ENV=prod nodemon --watch src --ext ts --exec \"npm run build && APP_ENV=prod node ./dist/server.js\"",
+    "env:dev": "cp .env.dev .env && echo 'Switched root .env to DEV'",
+    "env:prod": "cp .env.prod .env && echo 'Switched root .env to PROD'",
     "gcp-build": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build",
     "start": "npx prisma migrate deploy && node dist/server.js",
     "postinstall": "npx puppeteer browsers install chrome"
@@ -47,6 +51,7 @@
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.296",
     "pg": "^8.17.1",
+    "posthog-node": "^5.55.0",
     "puppeteer": "^24.39.0",
     "react": "^19.2.4",
     "redis": "^5.11.0",

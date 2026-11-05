@@ -1,0 +1,196 @@
+import { NextFunction, Request, Response } from "express";
+import { profile_stage_schema } from "../../lib/zod-schemas/kyc-onboarding.schema.js";
+import AppError from "../../middleware/error.middleware.js";
+import logger from "../../middleware/logger.js";
+import { cybrilla_kyc_form_service } from "../../services/cybrilla/kyc_form.service.js";
+import { fintech_primitive_address_service } from "../../services/fintech-primitive/address.service.js";
+import { fintech_primitive_email_address_service } from "../../services/fintech-primitive/email_address.service.js";
+import { fintech_primitive_investor_profile_service } from "../../services/fintech-primitive/investor_profile.service.js";
+import { fintech_primitive_phone_number_service } from "../../services/fintech-primitive/phone_number.service.js";
+import { kyc_profile_service } from "../../services/kyc/kyc-profile.service.js";
+import { build_kyc_form_patch_payload, map_pep_details_for_investor_profile } from "../../services/kyc/onboarding-field-mapper.js";
+import { user_onboarding_service } from "../../services/kyc/user.onboarding.service.js";
+import { user_service } from "../../services/user.service.js";
+
+const TERMINAL_KYC_STATUSES = ["failed", "expired", "submitted"];
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+class InvestorProfileControllerClass {
+
+    /**
+     * Profile stage ("Review Profile" screen). Requires the email stage to have passed first -
+     * the address reaches FP and Cybrilla from here, so it has to be OTP-proven before this runs.
+     * 1. Create the Fintech Primitives investor_profile (id -> User.investor_profile).
+     * 2. Register address/phone/email as FP objects, and the penny-drop bank account (if saved)
+     *    as an FP bank_account object - all required to build folio_defaults later. Investment
+     *    account creation itself moved to the Nominee stage (needs related_party ids too).
+     * 3. If the user has a kyc_form still in progress, fetch its current fields_needed and
+     *    patch whatever this screen's data can now satisfy - keeps KYC moving forward without
+     *    a separate step, per the flow we settled on.
+     */
+    complete_profile_stage = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id = req.user?.id!;
+            const input = profile_stage_schema.parse(req.body);
+
+            logger.info(`Completing profile stage for user ${user_id} with payload --> `, { input });
+
+            const onboarding_before = await user_onboarding_service.get_or_create(user_id);
+            if (onboarding_before.email_status !== "VERIFIED") {
+                throw new AppError("Verify your email first", 400, "EMAIL_VERIFICATION_REQUIRED");
+            }
+
+            const kyc_profile = await kyc_profile_service.upsert_profile_stage(user_id, input);
+
+            if (!kyc_profile.pan) {
+                throw new AppError("Complete PAN verification first", 400, "PAN_VERIFICATION_REQUIRED");
+            }
+
+            // 1. Check if user already has verified KYC (Case 1) vs. fresh KYC in progress (Case 2)
+            if (onboarding_before.kyc_status === "VERIFIED") {
+                // === CASE 1: EXISTING / VERIFIED KYC ===
+                const ip_address = req.ip || req.socket.remoteAddress || undefined;
+
+                const investor_profile = await fintech_primitive_investor_profile_service.create_investor_profile({
+                    name: kyc_profile.full_name!,
+                    date_of_birth: kyc_profile.dob!,
+                    gender: kyc_profile.gender!,
+                    occupation: kyc_profile.occupation!,
+                    pan: kyc_profile.pan,
+                    place_of_birth: kyc_profile.place_of_birth,
+                    use_default_tax_residences: kyc_profile.use_default_tax_residences,
+                    first_tax_residency: kyc_profile.first_tax_residency,
+                    source_of_wealth: kyc_profile.source_of_fund!,
+                    income_slab: kyc_profile.income_slab!,
+                    pep_details: map_pep_details_for_investor_profile(kyc_profile.is_pep_declaration_confirmed),
+                    ip_address,
+                });
+
+                if (!investor_profile?.id) {
+                    logger.error("Fintech Primitives investor_profile response missing id ==> ", investor_profile);
+                    throw new AppError("Failed to create investor profile", 502, "INVESTOR_PROFILE_CREATE_FAILED");
+                }
+
+                const user = await user_service.update_user(user_id, { investor_profile: investor_profile.id });
+
+                // Register address/phone/email as FP objects
+                const address = await fintech_primitive_address_service.create_address(investor_profile.id, {
+                    line1: kyc_profile.address!,
+                    postal_code: kyc_profile.pincode!,
+                    city: kyc_profile.city!,
+                    country: "IN",
+                    nature: "residential",
+                });
+
+                const phone = await fintech_primitive_phone_number_service.create_phone_number(
+                    investor_profile.id, "91", user.phone_no!, "self"
+                );
+
+                const email = await fintech_primitive_email_address_service.create_email_address(
+                    investor_profile.id, user.email!, "self"
+                );
+
+                await kyc_profile_service.upsert(user_id, {
+                    fp_address_id: address?.id ?? null,
+                    fp_phone_id: phone?.id ?? null,
+                    fp_email_id: email?.id ?? null,
+                });
+
+                // Advance to Penny Drop stage
+                await user_onboarding_service.update_stage(user_id, {
+                    profile_status: "VERIFIED",
+                    current_stage: "PENNY_DROP_VERIFICATION",
+                });
+
+                const onboarding = await user_onboarding_service.get_status_summary(user_id);
+
+                res.status(200).json({
+                    success: true,
+                    message: "Profile stage completed",
+                    data: {
+                        investor_profile_id: investor_profile.id,
+                        next_action: "PROCEED_TO_PENNY_DROP",
+                        onboarding,
+                    }
+                });
+                return;
+            } else {
+                // === CASE 2: FRESH KYC IN PROGRESS ===
+                // Patch in-progress Cybrilla kyc_form with profile demographic data
+                let kyc_form_patch_result: any = null;
+
+                if (kyc_profile.cybrilla_kyc_form_id && !TERMINAL_KYC_STATUSES.includes(kyc_profile.cybrilla_status ?? "")) {
+                    const user = await user_service.get_user_by_id(user_id);
+                    const latest_kyc_form = await cybrilla_kyc_form_service.get_kyc_form(kyc_profile.cybrilla_kyc_form_id);
+                    const fields_needed: string[] = latest_kyc_form?.requirements?.fields_needed ?? [];
+
+                    if (fields_needed.length > 0) {
+                        const patch_payload = build_kyc_form_patch_payload(fields_needed, {
+                            user: { email: user?.email, phone_no: user?.phone_no },
+                            kyc_profile: kyc_profile!,
+                        });
+
+                        if (Object.keys(patch_payload).length > 0) {
+                            logger.debug("Patching in-progress kyc_form from profile stage data", { fields: Object.keys(patch_payload) });
+                            kyc_form_patch_result = await cybrilla_kyc_form_service.update_kyc_form(kyc_profile.cybrilla_kyc_form_id, patch_payload);
+                            await kyc_profile_service.upsert_kyc_form(user_id, kyc_form_patch_result);
+                        }
+                    } else {
+                        kyc_form_patch_result = latest_kyc_form;
+                    }
+                }
+
+                // Cybrilla generates the eSign document asynchronously after receiving the patch.
+                // Poll Cybrilla with a short delay (1.5s interval, up to 2 attempts) so frontend directly receives the esign_url.
+                let esign_url = kyc_form_patch_result?.esign_details?.esign_url ?? null;
+                let current_kyc_form = kyc_form_patch_result;
+
+                if (!esign_url && kyc_profile.cybrilla_kyc_form_id) {
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        logger.info(`Polling Cybrilla for eSign URL (attempt ${attempt}/2)...`, { user_id });
+                        await sleep(1500);
+                        current_kyc_form = await cybrilla_kyc_form_service.get_kyc_form(kyc_profile.cybrilla_kyc_form_id);
+                        esign_url = current_kyc_form?.esign_details?.esign_url ?? null;
+                        if (esign_url) {
+                            logger.info(`Cybrilla eSign URL ready on attempt ${attempt}`, { user_id, esign_url });
+                            await kyc_profile_service.upsert_kyc_form(user_id, current_kyc_form);
+                            break;
+                        }
+                    }
+                }
+
+                // Do NOT create FP investor_profile yet — user must eSign first!
+                await user_onboarding_service.update_stage(user_id, {
+                    profile_status: "IN_PROGRESS",
+                    kyc_status: "IN_PROGRESS",
+                });
+
+                const onboarding = await user_onboarding_service.get_status_summary(user_id);
+
+                res.status(200).json({
+                    success: true,
+                    message: esign_url ? "Profile details submitted. Please proceed to eSign." : "Profile details submitted. Generating eSign link...",
+                    data: {
+                        status: current_kyc_form?.status ?? "awaiting_esign",
+                        esign_url: esign_url ?? null,
+                        next_action: esign_url ? "PROCEED_TO_ESIGN" : "POLL_KYC_STATUS",
+                        kyc_form: current_kyc_form ? {
+                            status: current_kyc_form.status,
+                            fields_needed: current_kyc_form.requirements?.fields_needed ?? [],
+                            esign_url: esign_url ?? null,
+                        } : null,
+                        onboarding,
+                    }
+                });
+                return;
+            }
+            return;
+        } catch (error) {
+            logger.error("Error in complete_profile_stage controller:", error);
+            next(error);
+            return;
+        }
+    }
+}
+
+export const investor_profile_controller = new InvestorProfileControllerClass();
