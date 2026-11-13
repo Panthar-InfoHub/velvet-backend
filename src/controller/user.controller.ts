@@ -11,6 +11,7 @@ import { db } from "../server.js";
 import { mf_cart_service } from "../services/mf-cart.service.js";
 import { user_onboarding_service } from "../services/kyc/user.onboarding.service.js";
 import { fire_report_service } from "../services/fire.report.service.js";
+import { user_goal_service } from "../services/onboarding/user.goal.service.js";
 class UserFinanceControllerClass {
 
 
@@ -52,36 +53,10 @@ class UserFinanceControllerClass {
 
             // const { fire_number, net_worth, total_expenses, fire_percentage } = await fire_report_service.get_current_fire_number(user_id);
 
-            // Home-screen summary card: portfolio value split MF / FD. MF comes from MfHolding
-            // (kept in sync by mf-holding-sync.service.ts), FD from the user's own FD transactions -
-            // no live provider call on this path. Runs through the same
-            // user_service.aggregate_portfolio_data as GET /user/portfolio so the two screens can
-            // never disagree on the same number.
-            const holdings = await db.mfHolding.findMany({
-                where: { user_id },
-                select: { isin: true, invested_amount: true, current_value: true },
-            });
-
-            const mf_current_value = holdings.reduce((sum, h) => sum + Number(h.current_value), 0);
-            const mf_invested_amount = holdings.reduce((sum, h) => sum + Number(h.invested_amount), 0);
-
-            const mf_investment_data = {
-                current_value: Number(mf_current_value.toFixed(2)),
-                invested_amount: Number(mf_invested_amount.toFixed(2)),
-                total_returns: Number((mf_current_value - mf_invested_amount).toFixed(2)),
-                return_percent: mf_invested_amount > 0
-                    ? Number((((mf_current_value - mf_invested_amount) / mf_invested_amount) * 100).toFixed(2))
-                    : 0,
-                // One entry per distinct fund, matching how the portfolio screen groups its cards
-                // (a fund held across two folios is one holding to the user, not two).
-                items_count: new Set(holdings.map(h => h.isin)).size,
-            };
-
-            const fd_response = await user_service.get_user_fd_data({ user_id, order: { fd_issued_at: 'desc' } });
-            const portfolio_aggregates = user_service.aggregate_portfolio_data(
-                mf_investment_data,
-                fd_response.fd_transactions || []
-            );
+            // Home-screen summary card: portfolio value split MF / FD. Uses cached portfolio
+            // summary (with 1-day TTL) matching GET /user/portfolio aggregates.
+            const portfolio_summary = await user_service.get_user_portfolio_summary(user_id);
+            const portfolio_aggregates = portfolio_summary.portfolio_aggregates;
 
             // const wrapper_user_goal = data.user_goals.length > 0 ? data.user_goals.map((goal: UserGoals, index: number) => {
 
@@ -118,6 +93,7 @@ class UserFinanceControllerClass {
                 message: "User data fetched successfully",
                 data: {
                     ...data,
+                    user_goals: data.user_goals.map((goal: any) => user_goal_service.formatGoalWithHoldings(goal)),
                     onboarding: data?.onboarding ? {
                         ...data.onboarding,
                         ...onboarding_summary,
@@ -471,6 +447,18 @@ class UserFinanceControllerClass {
 
             // Aggregate portfolio data with allocation breakdown
             const portfolio_aggregates = user_service.aggregate_portfolio_data(investment_data, fd_transactions);
+
+            // Update cached summary for fast access by home screen and fire number
+            const portfolio_summary = {
+                portfolio_value: portfolio_aggregates.total_investments.current_value,
+                mutual_funds: portfolio_aggregates.total_investments.allocation.mutual_funds.value,
+                fixed_deposits: portfolio_aggregates.total_investments.allocation.fixed_deposits.value,
+                total_returns: portfolio_aggregates.total_investments.total_returns,
+                return_percent: portfolio_aggregates.total_investments.return_percent,
+                total_invested: portfolio_aggregates.invested_amount_breakdown.invested_amount,
+                portfolio_aggregates,
+            };
+            user_service.set_cached_portfolio_summary(user.id, portfolio_summary);
 
             res.status(200).json({
                 code: 200,
