@@ -12,6 +12,7 @@ import { mf_cart_service } from "../services/mf-cart.service.js";
 import { user_onboarding_service } from "../services/kyc/user.onboarding.service.js";
 import { fire_report_service } from "../services/fire.report.service.js";
 import { user_goal_service } from "../services/onboarding/user.goal.service.js";
+import { decentro_service } from "../services/decentro.service.js";
 class UserFinanceControllerClass {
 
 
@@ -311,7 +312,18 @@ class UserFinanceControllerClass {
             for (const h of holdings) {
                 const invested = Number(h.invested_amount);
                 const current = Number(h.current_value);
+                const holding_units = Number(h.units);
+                const holding_redeemable = Number(h.redeemable_units ?? h.units);
                 const existing = by_fund.get(h.isin);
+
+                const folio_item = {
+                    holding_id: h.id,
+                    folio_number: h.folio_number,
+                    units: Number(holding_units.toFixed(4)),
+                    redeemable_units: Number(holding_redeemable.toFixed(4)),
+                    amount: Number(invested.toFixed(2)),
+                    current_value: Number(current.toFixed(2)),
+                };
 
                 if (!existing) {
                     by_fund.set(h.isin, {
@@ -328,14 +340,16 @@ class UserFinanceControllerClass {
                         xirr: h.xirr ? Number(h.xirr) : null,
                         return_percentage: h.absolute_return,
                         current_value: current,
-                        bal_units: Number(h.units),
-                        folios: [h.folio_number],
+                        bal_units: holding_units,
+                        redeemable_units: holding_redeemable,
+                        folios: [folio_item],
                     });
                 } else {
                     existing.amount += invested;
                     existing.current_value += current;
-                    existing.bal_units += Number(h.units);
-                    existing.folios.push(h.folio_number);
+                    existing.bal_units += holding_units;
+                    existing.redeemable_units += holding_redeemable;
+                    existing.folios.push(folio_item);
                 }
             }
 
@@ -361,9 +375,10 @@ class UserFinanceControllerClass {
                     amount: Number(f.amount.toFixed(2)),
                     current_value: Number(f.current_value.toFixed(2)),
                     return: Number((f.current_value - f.amount).toFixed(2)),
-                    folio: f.folios[0],
+                    folio: f.folios[0]?.folio_number,
                     folios: f.folios,
                     bal_units: Number(f.bal_units.toFixed(4)),
+                    redeemable_units: Number(f.redeemable_units.toFixed(4)),
                     img_url: f.img_url,
                 }
             });
@@ -671,6 +686,48 @@ class UserFinanceControllerClass {
             return;
         }
     }
+
+    fetch_address = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user_id: string = req.user!.id;
+            logger.info(`Fetching address for user ${user_id}`);
+
+            const user = await db.user.findUnique({
+                where: { id: user_id },
+                select: {
+                    id: true,
+                    phone_no: true,
+                    kyc_profile: {
+                        select: {
+                            id: true,
+                            pre_verification_response: true,
+                        },
+                    },
+                },
+            });
+
+            if (!user) {
+                throw new AppError("User not found", 404, "USER_NOT_FOUND");
+            }
+            if (!user.phone_no) {
+                throw new AppError("User mobile number not found", 400, "PHONE_NUMBER_NOT_FOUND");
+            }
+
+            const address_data = await decentro_service.get_address(user.phone_no);
+
+            res.status(200).json({
+                code: 200,
+                success: true,
+                message: "User address fetched successfully",
+                data: address_data,
+            });
+            return;
+        } catch (error) {
+            logger.error(`Error in fetch_address: ${error}`);
+            next(error);
+            return;
+        }
+    };
 
 
 
